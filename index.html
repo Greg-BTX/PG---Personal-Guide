@@ -228,6 +228,13 @@ button.vid{cursor:pointer}
 .danger{align-self:stretch;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:22px;padding:13px;border:1.5px solid var(--bad);border-radius:14px}
 .danger svg{width:18px;height:18px}
 .danger.sure{background:var(--bad);color:var(--bg)}
+
+.dup{align-self:stretch;margin-top:10px}
+.aviso.ok{color:var(--good)}
+.toast{position:fixed;left:16px;right:16px;bottom:16px;max-width:488px;margin:0 auto;z-index:5;display:flex;align-items:center;gap:6px;background:var(--ink);color:var(--bg);border-radius:14px;padding:6px 6px 6px 16px;font-size:14px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+.toast span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toast button{flex:none;padding:10px 12px;border-radius:10px;font-weight:700;color:var(--bg)}
+.toast button[data-undo]{background:var(--accent);color:var(--accent-ink)}
 </style>
 </head>
 <body>
@@ -315,19 +322,22 @@ const ler = (k, pad) => { try { return JSON.parse(localStorage.getItem(k)) || pa
 const gravar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
 
 // Dados cadastrados: na primeira vez vale o exemplo acima; depois, o que estiver salvo no aparelho.
-const salvo = ler('pg-dados-v1', null);
-if (salvo) {
-  categorias.length = 0; categorias.push(...salvo.categorias);
-  for (const [alvo, fonte] of [[exercicios, salvo.exercicios], [rotinas, salvo.rotinas], [rotina_exercicios, salvo.rotina_exercicios], [agenda, salvo.agenda]]) {
+function aplicarDados(src) {
+  categorias.length = 0; categorias.push(...src.categorias);
+  for (const [alvo, fonte] of [[exercicios, src.exercicios], [rotinas, src.rotinas], [rotina_exercicios, src.rotina_exercicios], [agenda, src.agenda]]) {
     Object.keys(alvo).forEach(k => delete alvo[k]);
-    Object.assign(alvo, fonte);
+    Object.assign(alvo, fonte || {});
   }
 }
+const dadosValidos = d => d && Array.isArray(d.categorias) && d.exercicios && d.rotinas && d.rotina_exercicios && typeof d.exercicios === 'object';
+const salvo = ler('pg-dados-v1', null);
+if (dadosValidos(salvo)) aplicarDados(salvo);
+const foto = () => JSON.stringify({ categorias, exercicios, rotinas, rotina_exercicios, agenda });
 const salvarDados = () => gravar('pg-dados-v1', { categorias, exercicios, rotinas, rotina_exercicios, agenda });
 
 const DIAS = [[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[0,'Dom']];
 const hoje = new Date().getDay();
-const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, editR:null, editE:null, voltaEx:'gerir', voltaRot:'gerir', voltaGerir:'semana', editando:false, player:false, confirma:null, aviso:'',
+const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, editR:null, editE:null, voltaEx:'gerir', voltaRot:'gerir', voltaGerir:'semana', editando:false, player:false, confirma:null, aviso:'', undo:null,
   feitos: ler('pg-feitos-v2', {}) };   // feitos[data][rotina] = [exercícios]: cada data começa zerada
 const config = Object.assign({ diaAtual:true }, ler('pg-config-v1', {}));
 const salvarConfig = () => gravar('pg-config-v1', config);
@@ -457,6 +467,9 @@ function render() {
   else if (state.tela === 'config') {
     h += voltar('Início') + `<h1 class="brand">Configurações</h1>`;
     h += `<button class="setting" role="switch" aria-checked="${config.diaAtual}" data-toggle="diaAtual"><span class="st"><b>Abrir no dia de hoje</b><small>Desligado, você escolhe o dia sempre que entrar.</small></span><span class="sw"></span></button>`;
+    h += `<h2 class="sec">Cópia de segurança</h2><p class="eyebrow">Guarda em um arquivo tudo o que você cadastrou. Importar substitui os dados atuais.</p>`;
+    h += `<div class="rowsel"><button class="btn ghost grow" data-exportar="1">Exportar</button><label class="btn ghost grow" for="impArq">Importar</label></div><input id="impArq" type="file" accept="application/json,.json" class="oculto">`;
+    if (state.aviso) h += `<p class="aviso ok">${esc(state.aviso)}</p>`;
   }
 
   else if (state.tela === 'semana') {
@@ -549,7 +562,7 @@ function render() {
     lista.forEach((x, i) => h += `<div class="ordem"><button class="on" data-edite="${x}"><span class="n">${i + 1}</span>${esc(exercicios[x].nome)}</button><button class="mini" data-sobe="${i}" aria-label="Subir"${i ? '' : ' disabled'}>↑</button><button class="mini" data-desce="${i}" aria-label="Descer"${i < lista.length - 1 ? '' : ' disabled'}>↓</button><button class="mini" data-tira="${i}" aria-label="Tirar da rotina">✕</button></div>`);
     if (es.length) h += `<div class="rowsel"><select id="addSel" aria-label="Exercício para adicionar">${es.map(x => `<option value="${x}">${esc(exercicios[x].nome)}</option>`).join('')}</select><button class="btn ghost" data-addex="1">Adicionar</button></div>`;
     h += `<button class="add" data-novoe="1">+ Novo exercício</button>`;
-    h += excluir('rot', 'Excluir rotina') + `</div>`;
+    h += `<button class="btn ghost dup" data-duplicar="rot">Duplicar rotina</button>` + excluir('rot', 'Excluir rotina') + `</div>`;
   }
 
   else if (state.tela === 'editEx') {
@@ -564,13 +577,25 @@ function render() {
     if (e.imagem) h += `<div class="foto"><img src="${e.imagem}" alt="Foto atual"></div>`;
     h += `<div class="rowsel"><label class="btn ghost grow" for="exFoto">${e.imagem ? 'Trocar foto' : 'Escolher foto'}</label>${e.imagem ? '<button class="btn ghost" data-delfoto="1">Remover</button>' : ''}</div><input id="exFoto" type="file" accept="image/*" class="oculto"></div>`;
     if (state.aviso) h += `<p class="aviso">${esc(state.aviso)}</p>`;
-    h += excluir('ex', 'Excluir exercício') + `</div>`;
+    h += `<button class="btn ghost dup" data-duplicar="ex">Duplicar exercício</button>` + excluir('ex', 'Excluir exercício') + `</div>`;
   }
 
+  if (state.undo) h += `<div class="toast" role="status"><span>${esc(state.undo.txt)}</span><button data-undo="1">Desfazer</button><button data-fechatoast="1" aria-label="Fechar aviso">✕</button></div>`;
   app.className = 'app' + (state.tela === 'exercicio' ? ' tela-ex' : '');
   app.innerHTML = h;
 }
 
+// guarda uma cópia dos dados antes de apagar; o aviso com "Desfazer" some sozinho
+let undoTimer = null;
+function guardarDesfazer(txt) {
+  state.undo = { snap: foto(), txt };
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    state.undo = null;
+    const el = document.querySelector && document.querySelector('.toast');
+    if (el) el.remove();
+  }, 9000);
+}
 function apagarEx(id) {
   delete exercicios[id];
   for (const r in rotina_exercicios) rotina_exercicios[r] = rotina_exercicios[r].filter(x => x !== id);
@@ -644,10 +669,37 @@ app.addEventListener('click', ev => {
   else if (d.tira) { lista.splice(+d.tira, 1); salvarDados(); }
   else if (d.addex) { const sel = document.getElementById('addSel'); if (sel && exercicios[sel.value]) { lista.push(sel.value); salvarDados(); } }
   else if (d.delfoto) { delete exercicios[state.editE].imagem; salvarDados(); }
+  else if (d.undo) {
+    if (state.undo) { aplicarDados(JSON.parse(state.undo.snap)); salvarDados(); state.undo = null; clearTimeout(undoTimer); }
+    if (!categorias.some(c => c.id === state.cat) || (state.tela === 'editRotina' && !rotinas[state.editR]) || (state.tela === 'editEx' && !exercicios[state.editE])) ir('inicio');
+  }
+  else if (d.fechatoast) { state.undo = null; clearTimeout(undoTimer); }
+  else if (d.duplicar === 'ex') {
+    const id = novoId(), o = exercicios[state.editE];
+    exercicios[id] = JSON.parse(JSON.stringify(o)); exercicios[id].nome = o.nome + ' (cópia)';
+    if (state.voltaEx === 'editRotina' && rotina_exercicios[state.editR]) rotina_exercicios[state.editR].push(id);
+    state.editE = id; salvarDados(); ir('editEx');
+  }
+  else if (d.duplicar === 'rot') {
+    const id = novoId(), o = rotinas[state.editR];
+    rotinas[id] = { categoria: o.categoria, nome: o.nome + ' (cópia)' };
+    rotina_exercicios[id] = idsDe(state.editR).slice();
+    state.editR = id; salvarDados(); ir('editRotina');
+  }
+  else if (d.exportar) {
+    try {
+      const blob = new Blob([JSON.stringify({ app:'pratica-guiada', versao:1, dados: JSON.parse(foto()), feitos: state.feitos, config }, null, 1)], { type:'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'pratica-guiada-' + chaveDe(hoje) + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      state.aviso = 'Arquivo gerado. Procure na pasta de downloads.';
+    } catch (e) { state.aviso = 'Não consegui gerar o arquivo neste navegador.'; }
+  }
   else if (d.delitem) {
     if (state.confirma !== d.delitem) state.confirma = d.delitem;
     else {
       const [tipo, id] = d.delitem.split(':');
+      guardarDesfazer(`"${(tipo === 'ex' ? exercicios : rotinas)[id].nome}" apagado`);
       if (tipo === 'ex') apagarEx(id); else apagarRot(id);
       state.confirma = null; salvarDados();
     }
@@ -655,6 +707,7 @@ app.addEventListener('click', ev => {
   else if (d.del) {
     if (state.confirma !== d.del) state.confirma = d.del;
     else {
+      guardarDesfazer(`"${d.del === 'ex' ? exercicios[state.editE].nome : d.del === 'rot' ? rotinas[state.editR].nome : categorias.find(c => c.id === state.cat).nome}" apagado`);
       if (d.del === 'ex') { apagarEx(state.editE); ir(state.voltaEx === 'exercicio' ? 'rotina' : state.voltaEx); }
       else if (d.del === 'rot') { apagarRot(state.editR); ir(state.voltaRot); }
       else if (d.del === 'cat') {
@@ -676,6 +729,25 @@ app.addEventListener('click', ev => {
 app.addEventListener('change', ev => {
   const t = ev.target, d = t.dataset || {}, v = String(t.value ?? '').trim();
   const e = exercicios[state.editE];
+  if (t.id === 'impArq') {
+    const file = t.files && t.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onerror = () => { state.aviso = 'Não consegui ler o arquivo.'; render(); };
+    r.onload = () => {
+      try {
+        const o = JSON.parse(r.result), d = o.dados || o;
+        if (!dadosValidos(d)) throw 0;
+        guardarDesfazer('Dados importados');
+        aplicarDados(d);
+        if (o.feitos && typeof o.feitos === 'object') { Object.assign(state.feitos, o.feitos); salvar(); }
+        state.aviso = salvarDados() ? '' : 'Importado, mas sem espaço para guardar no aparelho.';
+      } catch (e) { state.aviso = 'Este arquivo não é uma cópia do Prática Guiada.'; }
+      render();
+    };
+    r.readAsText(file);
+    return;
+  }
   if (t.type === 'file') {
     const file = t.files && t.files[0];
     if (!file) return;
