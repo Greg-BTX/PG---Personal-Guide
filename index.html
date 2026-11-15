@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prática Guiada</title>
+<meta name="theme-color" content="#2B2927">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: coluna única de celular; a faixa da semana escolhe a rotina,
+   a lista numerada é a ordem do treino, o diagrama do braço é a peça central. */
+:root{
+  color-scheme:dark;
+  --bg:#2B2927; --surface:#383532; --ink:#EDE7DC; --muted:#ADA498;
+  --line:#4D4843; --accent:#F0A070; --accent-ink:#2B1A10;
+  --root:#F4C95D; --root-ink:#2B2000; --good:#93C9A5;
+  --display:"Bricolage Grotesque","Figtree",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+.app{min-height:100%;max-width:520px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:18px}
+
+header{display:flex;flex-direction:column;gap:12px}
+.brand{font-family:var(--display);font-weight:700;font-size:28px;letter-spacing:-.02em;margin:0;line-height:1.1}
+.cats{display:flex;gap:8px;flex-wrap:wrap}
+.cat{padding:7px 14px;border-radius:999px;border:1.5px solid var(--line);font-weight:600;font-size:14px;color:var(--muted)}
+.cat[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.cat.new{border-style:dashed}
+
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.day{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 7px;border-radius:12px;background:var(--surface);border:1.5px solid transparent}
+.day .d{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.day .t{font-family:var(--display);font-weight:700;font-size:15px}
+.day .dot{width:5px;height:5px;border-radius:50%;background:transparent}
+.day.today .dot{background:var(--root)}
+.day[aria-pressed="true"]{border-color:var(--accent)}
+.day[aria-pressed="true"] .d{color:var(--accent)}
+
+.routine{display:flex;flex-direction:column;gap:10px}
+.eyebrow{font-size:13px;font-weight:600;color:var(--muted);margin:0}
+.routine h2{font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.01em;margin:0;line-height:1.15;text-wrap:balance}
+.routine p.sum{margin:0;color:var(--muted);font-size:15px}
+.prog{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--good);border-radius:3px;transition:width .25s}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+.reset{font-size:13px;font-weight:600;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+
+ol.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ex{background:var(--surface);border-radius:14px;border:1.5px solid transparent}
+.ex.open{border-color:var(--line)}
+.row{display:flex;align-items:center;gap:12px;padding:14px 12px}
+.check{flex:none;width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:15px;color:var(--muted)}
+.ex.done .check{background:var(--good);border-color:var(--good);color:var(--bg)}
+.head{flex:1;min-width:0;text-align:left;display:flex;align-items:center;gap:8px}
+.head .txt{flex:1;min-width:0}
+.name{display:block;font-weight:600;font-size:16px;line-height:1.25}
+.ex.done .name{color:var(--muted);text-decoration:line-through}
+.meta{display:block;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px}
+.chev{flex:none;width:18px;height:18px;color:var(--muted);transition:transform .2s}
+.ex.open .chev{transform:rotate(180deg)}
+@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+
+.detail{padding:2px 12px 14px;display:flex;flex-direction:column;gap:12px}
+.fig{background:var(--bg);border-radius:10px;padding:10px;overflow-x:auto}
+.fig svg{display:block;flex:none}
+.fig pre{margin:0;font-family:var(--mono);font-size:12px;line-height:1.5;color:var(--ink)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:11px;height:11px;border-radius:50%;display:inline-block}
+.legend .r{background:var(--root)} .legend .n{background:var(--ink)}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px;font-size:15px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:10px;font-weight:600;font-size:14px;text-decoration:none}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{border:1.5px solid var(--line);color:var(--ink)}
+
+.empty{background:var(--surface);border-radius:14px;padding:22px 18px;display:flex;flex-direction:column;gap:6px}
+.empty h2{font-family:var(--display);font-size:20px;margin:0}
+.empty p{margin:0;color:var(--muted);font-size:15px}
+.doneMsg{background:var(--surface);border-left:4px solid var(--good);border-radius:10px;padding:12px 14px;font-weight:600;font-size:15px}
+
+/* braço da guitarra */
+.fb .str{stroke:var(--muted);stroke-width:1.2}
+.fb .fret{stroke:var(--line);stroke-width:2}
+.fb .lbl{fill:var(--muted);font:600 11px var(--mono)}
+.fb .num{fill:var(--muted);font:600 11px var(--mono)}
+.fb .num.in{fill:var(--ink)}
+.fb .note{fill:var(--ink)}
+.fb .note.root{fill:var(--root)}
+.fb .nt{fill:var(--bg);font:700 11px var(--body)}
+.fb .nt.root{fill:var(--root-ink)}
+.fb .inlay{fill:var(--line)}
+
+.back{align-self:flex-start;font-weight:600;font-size:15px;color:var(--muted);padding:6px 8px 6px 0}
+.choices{display:flex;flex-direction:column;gap:10px}
+.choice{background:var(--surface);border-radius:16px;padding:30px 20px;text-align:left;font-family:var(--display);font-weight:700;font-size:24px;display:flex;justify-content:space-between;align-items:center}
+.dayrow{background:var(--surface);border-radius:14px;padding:16px;display:flex;align-items:center;gap:12px;text-align:left;width:100%;border:1.5px solid transparent}
+.dayrow.today{border-color:var(--accent)}
+.dayrow.off{background:transparent;border-color:var(--line);border-style:dashed}
+.dayrow .dn{font-weight:600;flex:1;display:flex;align-items:center;gap:8px}
+.dayrow .rn{color:var(--muted);font-size:14px}
+.tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+.chev.right{transform:rotate(-90deg)}
+.btn.grow{flex:1}
+.btn{cursor:pointer}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.icon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--muted);background:var(--surface)}
+.icon svg{width:20px;height:20px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{aspect-ratio:1;background:var(--surface);border-radius:22px;padding:14px;display:flex;flex-direction:column;align-items:stretch;text-align:left}
+.tile svg{flex:1;min-height:0;width:100%}
+.tile span{font-family:var(--display);font-weight:700;font-size:19px}
+.tile.musica{background:color-mix(in srgb,var(--accent) 16%,var(--surface))}
+.tile.musculacao{background:color-mix(in srgb,var(--good) 16%,var(--surface))}
+.daybtn{font-weight:600;font-size:14px;color:var(--accent);padding:8px 14px;border-radius:999px;border:1.5px solid var(--line)}
+.setting{background:var(--surface);border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px;text-align:left;width:100%}
+.setting .st{flex:1}
+.setting b{display:block;font-weight:600}
+.setting small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.sw{flex:none;width:46px;height:28px;border-radius:14px;background:var(--line);position:relative;transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--ink);transition:transform .2s}
+.setting[aria-checked="true"] .sw{background:var(--good)}
+.setting[aria-checked="true"] .sw::after{transform:translateX(18px)}
+@media (prefers-reduced-motion:reduce){.sw,.sw::after{transition:none}}
+
+.hero{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:6px}
+.date{display:flex;align-items:flex-end;gap:10px}
+.date .num{font-family:var(--display);font-weight:700;font-size:76px;line-height:.78;letter-spacing:-.04em;color:var(--accent);font-variant-numeric:tabular-nums}
+.date .mo{display:flex;flex-direction:column;gap:2px;font-weight:700;font-size:15px;letter-spacing:.1em;text-transform:uppercase}
+.date .mo small{font-weight:500;font-size:14px;letter-spacing:0;text-transform:none;color:var(--muted)}
+.ring{flex:none;width:76px;height:76px}
+.ring circle{fill:none;stroke-width:6}
+.ring .trk{stroke:var(--line)}
+.ring .arc{stroke:var(--good);stroke-linecap:round;transition:stroke-dasharray .3s}
+.ring text{fill:var(--ink);font:700 17px var(--display);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.ring .arc{transition:none}}
+.tl{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column}
+.tl .phase{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 0 10px 48px}
+.tl .it{display:flex;gap:14px;align-items:stretch}
+.tl .rail{flex:none;width:34px;display:flex;flex-direction:column;align-items:center}
+.tl .rail::after{content:"";flex:1;width:2px;min-height:14px;background:var(--line);margin:4px 0;border-radius:1px}
+.tl .it.done .rail::after{background:var(--good)}
+.tl .it:last-child .rail::after{visibility:hidden}
+.tl .it.done .check{background:var(--good);border-color:var(--good);color:var(--bg)}
+.tl .it.next .check{border-color:var(--accent);color:var(--accent)}
+.tl .body{flex:1;min-width:0;text-align:left;display:flex;flex-direction:column;gap:2px;padding:5px 0 20px}
+.tl .it.done .name{color:var(--muted);text-decoration:line-through}
+.tl .it.next .body{background:var(--surface);border-radius:16px;padding:14px 16px 16px;margin-bottom:16px;gap:4px}
+.tl .it.next .name{font-family:var(--display);font-weight:700;font-size:20px}
+.tl .meta{margin-top:0}
+
+.app.tela-ex{padding-bottom:0}
+.count{font-size:14px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.segs{display:flex;gap:4px;margin-top:-8px}
+.segs i{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.segs i.ok{background:var(--good)}
+.segs i.cur{background:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips span{font-size:13px;font-weight:600;padding:5px 11px;border-radius:999px;background:var(--surface);color:var(--muted)}
+.fig.big{background:var(--surface);border-radius:18px;padding:16px 14px 12px;margin-top:4px}
+.fig.big .fb .nt{fill:var(--surface)}
+.passos{list-style:none;margin:6px 0 0;padding:0;counter-reset:p;display:flex;flex-direction:column;gap:14px}
+.passos li{counter-increment:p;display:flex;gap:14px;font-size:16px;line-height:1.4}
+.passos li::before{content:counter(p);flex:none;width:22px;font-family:var(--display);font-weight:700;font-size:18px;color:var(--accent);line-height:1.2}
+.dock{position:sticky;bottom:0;margin-top:auto;display:flex;gap:10px;padding:28px 0 18px;background:linear-gradient(to bottom,transparent,var(--bg) 38%)}
+.vid{flex:none;width:68px;height:64px;border-radius:20px;background:var(--surface);color:var(--ink);text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:12px;font-weight:600}
+.vid svg{width:22px;height:22px;color:var(--accent)}
+.feito{flex:1;min-width:0;height:64px;border-radius:20px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;gap:12px;padding:0 20px;text-align:left}
+.feito>svg{flex:none;width:26px;height:26px}
+.feito span{min-width:0;display:flex;flex-direction:column}
+.feito b{font-family:var(--display);font-weight:700;font-size:20px;line-height:1.15}
+.feito small{font-size:13px;font-weight:500;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feito.off{background:var(--surface);color:var(--ink);flex-direction:column;align-items:flex-start;justify-content:center;gap:0}
+.feito:active{transform:scale(.98)}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+/* ---------- DADOS (espelham as tabelas do banco) ---------- */
+const categorias = [
+  { id: 'musica', nome: 'Música' },
+  { id: 'musculacao', nome: 'Musculação' }
+];
+
+const JANELAS = { 1:[5,8], 2:[7,10], 3:[9,13], 4:[12,15], 5:[14,17] }; // casas de cada shape em Lá menor
+const yt = q => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+
+const exercicios = {
+  along: { nome:'Alongamento de mãos e punhos', min:2, fig:null,
+    passos:['Abra e feche as mãos devagar, 10 vezes.','Estenda um braço à frente, palma para cima, e puxe os dedos para baixo com a outra mão por 15 segundos. Troque de lado.','Gire os punhos 10 vezes para cada lado.','Nada aqui deve doer. Se doer, alivie.'],
+    busca:'alongamento mãos punhos guitarrista' },
+  crom: { nome:'Cromático 1-2-3-4', min:5, bpm:'60 bpm', fig:{tipo:'tab', seg:'5-6-7-8-'},
+    passos:['Um dedo por casa: indicador na 5, médio na 6, anelar na 7, mínimo na 8.','Comece na 6ª corda (a mais grave) e suba corda por corda. Depois volte.','Palhetada alternada: uma para baixo, uma para cima.','Uma nota por clique do metrônomo. Som limpo vale mais que velocidade.'],
+    busca:'exercício cromático 1234 guitarra iniciante' },
+  lig: { nome:'Ligados: hammer-on e pull-off', min:3, bpm:'60 bpm', fig:{tipo:'tab', seg:'5h7p5-'},
+    passos:['Palhete só a primeira nota (casa 5).','Martele o anelar na casa 7 sem palhetar (hammer-on).','Puxe o anelar para soar a casa 5 de novo (pull-off).','Repita 4 vezes em cada corda, da mais grave à mais aguda.'],
+    busca:'hammer on pull off guitarra exercício' },
+  umacorda: { nome:'Pentatônica em uma corda só', min:5, bpm:'60 bpm', fig:{tipo:'braco', lo:5, hi:17},
+    passos:['Escolha uma corda e toque só as notas marcadas nela, da casa 5 até a 17.','Volte descendo pelas mesmas notas.','Repita em cada uma das 6 cordas.','Isso ensina o caminho horizontal entre os shapes.'],
+    busca:'pentatônica em uma corda guitarra' },
+  todos: { nome:'Os 5 shapes em sequência', min:10, bpm:'60–80 bpm', fig:{tipo:'braco', lo:5, hi:17},
+    passos:['Suba o shape 1 (casas 5–8) e desça pelo shape 2 (casas 7–10).','Suba o shape 3 e desça pelo 4. Suba o 5.','Volte o caminho inteiro até o shape 1.','Sem parar entre um shape e outro.'],
+    busca:'5 shapes pentatônica menor ao longo do braço' },
+  improvtotal: { nome:'Improviso pelo braço inteiro', min:10, fig:{tipo:'braco', lo:5, hi:17},
+    passos:['Coloque uma backing track em Lá menor.','Comece no shape 1 e mude de região a cada 4 compassos.','Termine as frases nas notas amarelas (Lá): é onde a frase soa resolvida.'],
+    busca:'backing track A minor blues', rotulo:'Buscar backing track no YouTube' },
+  tonicas1: { nome:'Shape 1: achar as tônicas', min:5, fig:{tipo:'braco', lo:5, hi:8},
+    passos:['Toque só as notas amarelas (Lá) do shape, da grave à aguda.','Diga "Lá" em voz alta a cada nota.','Depois toque o shape inteiro parando 2 tempos em cada Lá.'],
+    busca:'tônicas pentatônica menor shape 1' }
+};
+
+for (let n = 1; n <= 5; n++) {
+  const [lo, hi] = JANELAS[n];
+  exercicios['sobe'+n] = { nome:`Shape ${n}: subir e descer`, min:8, bpm:'60–80 bpm', fig:{tipo:'braco', lo, hi},
+    passos:[`Região das casas ${lo} a ${hi}. Comece na 6ª corda (linha de baixo do diagrama).`,'Toque as duas notas de cada corda, da mais grave à mais aguda, e volte.','Palhetada alternada, uma nota por clique.','Acertou 4 vezes seguidas sem erro? Suba o metrônomo 5 bpm.'],
+    busca:`pentatônica menor shape ${n} guitarra` };
+  exercicios['seq'+n] = { nome:`Shape ${n}: grupos de 3 notas`, min:5, bpm:'60 bpm', fig:{tipo:'braco', lo, hi},
+    passos:['Numere as notas do shape da mais grave à mais aguda: 1, 2, 3, 4…','Toque 1-2-3, depois 2-3-4, depois 3-4-5, até o fim.','Na volta, faça o mesmo descendo.','O objetivo é sair do sobe-e-desce automático.'],
+    busca:'pentatônica sequência de 3 notas guitarra' };
+  exercicios['improv'+n] = { nome:`Improviso em Lá menor no shape ${n}`, min:5, fig:{tipo:'braco', lo, hi},
+    passos:['Coloque uma backing track em Lá menor.','Use só as notas deste shape.','Faça frases curtas, de 3 a 5 notas, e deixe pausas.','Termine as frases nas notas amarelas (Lá).'],
+    busca:'backing track A minor blues', rotulo:'Buscar backing track no YouTube' };
+  if (n > 1) {
+    const plo = JANELAS[n-1][0];
+    exercicios['con'+n] = { nome:`Conexão: shape ${n-1} com shape ${n}`, min:5, bpm:'60 bpm', fig:{tipo:'braco', lo:plo, hi},
+      passos:[`Suba o shape ${n-1} e, na corda mais aguda, deslize para o shape ${n}.`,`Desça o shape ${n} e, na corda mais grave, deslize de volta para o ${n-1}.`,'Repare nas notas que os dois shapes dividem: são a ponte entre eles.'],
+      busca:`conectar shapes pentatônica ${n-1} e ${n}` };
+  }
+}
+
+const rotinas = {
+  g1:{ categoria:'musica', nome:'Shape 1, a base', resumo:'O desenho mais usado da pentatônica, nas casas 5 a 8.' },
+  g2:{ categoria:'musica', nome:'Shape 2', resumo:'Casas 7 a 10, ligado ao shape de ontem.' },
+  g3:{ categoria:'musica', nome:'Shape 3', resumo:'Casas 9 a 13, o que mais abre a mão.' },
+  g4:{ categoria:'musica', nome:'Shape 4', resumo:'Casas 12 a 15, uma oitava acima das cordas soltas.' },
+  g5:{ categoria:'musica', nome:'Shape 5', resumo:'Casas 14 a 17, o último antes de repetir o shape 1.' },
+  g6:{ categoria:'musica', nome:'Braço inteiro', resumo:'Junta os cinco shapes e termina com improviso.' }
+};
+const aquec = ['along','crom','lig'];
+const rotina_exercicios = {
+  g1:[...aquec,'sobe1','seq1','tonicas1','improv1'],
+  g2:[...aquec,'sobe2','seq2','con2','improv2'],
+  g3:[...aquec,'sobe3','seq3','con3','improv3'],
+  g4:[...aquec,'sobe4','seq4','con4','improv4'],
+  g5:[...aquec,'sobe5','seq5','con5','improv5'],
+  g6:[...aquec,'todos','umacorda','improvtotal']
+};
+// agenda: dia da semana (0 = domingo) -> rotina
+const agenda = { musica:{1:'g1',2:'g2',3:'g3',4:'g4',5:'g5',6:'g6',0:null}, musculacao:{} };
+
+/* ---------- ESTADO ---------- */
+const DIAS = [[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[0,'Dom']];
+const hoje = new Date().getDay();
+const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, feitos:{} };
+const config = { diaAtual:true };
+try { Object.assign(config, JSON.parse(localStorage.getItem('pg-config-v1')) || {}); } catch(e) {}
+const salvarConfig = () => { try { localStorage.setItem('pg-config-v1', JSON.stringify(config)); } catch(e) {} };
+try { state.feitos = JSON.parse(localStorage.getItem('pg-feitos-v1')) || {}; } catch(e) {}
+const salvar = () => { try { localStorage.setItem('pg-feitos-v1', JSON.stringify(state.feitos)); } catch(e) {} };
+
+/* ---------- DIAGRAMAS ---------- */
+const CORDAS = [['e',4],['B',11],['G',7],['D',2],['A',9],['E',4]]; // de cima (aguda) para baixo (grave)
+const PENTA = { 9:'A', 0:'C', 2:'D', 4:'E', 7:'G' };
+const MARCAS = [3,5,7,9,12,15,17];
+
+function braco(lo, hi) {
+  const n = hi - lo + 1, w = n <= 6 ? 52 : 42, h = 30, x0 = 26, y0 = 8;
+  const W = x0 + n*w + 8, H = y0 + 6*h + 26;
+  let s = `<svg class="fb" ${n <= 6 ? 'style="width:100%;height:auto"' : `width="${W}" height="${H}"`} viewBox="0 0 ${W} ${H}" role="img" aria-label="Braço da guitarra, casas ${lo} a ${hi}, com as notas da pentatônica de Lá menor">`;
+  for (let k = 0; k <= n; k++) s += `<line class="fret" x1="${x0+k*w}" y1="${y0+h/2}" x2="${x0+k*w}" y2="${y0+5.5*h}"/>`;
+  CORDAS.forEach(([nome], i) => {
+    const y = y0 + i*h + h/2;
+    s += `<line class="str" x1="${x0}" y1="${y}" x2="${x0+n*w}" y2="${y}"/><text class="lbl" x="6" y="${y+4}">${nome}</text>`;
+  });
+  for (let k = 0; k < n; k++) {
+    const f = lo + k, cx = x0 + k*w + w/2, m = MARCAS.includes(f);
+    s += `<text class="num${m?' in':''}" x="${cx}" y="${H-6}" text-anchor="middle">${f}</text>`;
+    if (m) s += `<circle class="inlay" cx="${cx}" cy="${H-22}" r="2.5"/>`;
+    CORDAS.forEach(([, solta], i) => {
+      const pc = (solta + f) % 12;
+      if (!(pc in PENTA)) return;
+      const cy = y0 + i*h + h/2, r = pc === 9 ? ' root' : '';
+      s += `<circle class="note${r}" cx="${cx}" cy="${cy}" r="11"/><text class="nt${r}" x="${cx}" y="${cy+4}" text-anchor="middle">${PENTA[pc]}</text>`;
+    });
+  }
+  return s + '</svg><div class="legend"><span><i class="r"></i>Tônica</span></div>';
+}
+
+function tab(seg) {
+  const vazio = '-'.repeat(seg.length);
+  // a corda grave (E) toca primeiro; na tablatura ela fica na linha de baixo
+  const linhas = CORDAS.map(([nome], i) => {
+    let l = nome + '|-';
+    for (let p = 0; p < 6; p++) l += (5 - i === p) ? seg : vazio;
+    return l + '|';
+  });
+  return `<pre aria-label="Tablatura do exercício">${linhas.join('\n')}</pre>`;
+}
+
+/* ---------- TELAS (uma decisão por tela) ---------- */
+// inicio -> rotina de hoje (ou semana, se a opção estiver desligada) -> exercicio
+const app = document.getElementById('app');
+const seta = '<svg class="chev right" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg>';
+const engrenagem = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>';
+const ARTE = {
+  musica: '<svg viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(35 60 60)"><rect x="53" y="8" width="14" height="14" rx="3" fill="var(--ink)"/><rect x="56" y="20" width="8" height="46" fill="var(--muted)"/><circle cx="60" cy="62" r="17" fill="var(--accent)"/><circle cx="60" cy="86" r="25" fill="var(--accent)"/><circle cx="60" cy="72" r="7" fill="var(--bg)"/><rect x="50" y="93" width="20" height="4" rx="2" fill="var(--accent-ink)"/><path d="M58 12V94M60 12V94M62 12V94" stroke="var(--ink)" stroke-width=".7" opacity=".8"/></g></svg>',
+  musculacao: '<svg viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(-25 60 60)"><rect x="30" y="56" width="60" height="8" rx="4" fill="var(--muted)"/><rect x="28" y="36" width="13" height="48" rx="5" fill="var(--good)"/><rect x="79" y="36" width="13" height="48" rx="5" fill="var(--good)"/><rect x="15" y="44" width="10" height="32" rx="4" fill="var(--ink)"/><rect x="95" y="44" width="10" height="32" rx="4" fill="var(--ink)"/></g></svg>'
+};
+const NOMES = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado',0:'Domingo'};
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const faseDe = id => aquec.includes(id) ? 'Aquecimento' : id.startsWith('improv') ? 'Improviso' : 'Prática';
+// data do dia escolhido, dentro da semana atual (segunda a domingo)
+function dataBloco() {
+  const pos = d => (d + 6) % 7, dt = new Date();
+  dt.setDate(dt.getDate() + pos(state.dia) - pos(hoje));
+  return `<div class="date"><span class="num">${String(dt.getDate()).padStart(2, '0')}</span><span class="mo">${MESES[dt.getMonth()]}<small>${state.dia === hoje ? 'Hoje, ' + NOMES[state.dia].toLowerCase() : NOMES[state.dia]}</small></span></div>`;
+}
+const voltar = txt => `<button class="back" data-back="1">‹ ${txt}</button>`;
+
+function render() {
+  const ag = agenda[state.cat] || {};
+  const temAgenda = Object.keys(ag).length > 0;
+  const rid = ag[state.dia] || null;
+  const ids = rid ? rotina_exercicios[rid] : [];
+  const feitos = rid ? (state.feitos[rid] || []) : [];
+  const cat = categorias.find(c => c.id === state.cat);
+  let h = '';
+
+  if (state.tela === 'inicio') {
+    h += `<div class="top"><h1 class="brand">O que vamos praticar?</h1><button class="icon" data-config="1" aria-label="Configurações">${engrenagem}</button></div><div class="tiles">`;
+    categorias.forEach(c => h += `<button class="tile ${c.id}" data-cat="${c.id}">${ARTE[c.id] || ''}<span>${c.nome}</span></button>`);
+    h += `</div>`;
+  }
+
+  else if (state.tela === 'config') {
+    h += voltar('Início') + `<h1 class="brand">Configurações</h1>`;
+    h += `<button class="setting" role="switch" aria-checked="${config.diaAtual}" data-toggle="diaAtual"><span class="st"><b>Abrir no dia de hoje</b><small>Desligado, você escolhe o dia sempre que entrar.</small></span><span class="sw"></span></button>`;
+  }
+
+  else if (state.tela === 'semana') {
+    h += voltar('Início') + `<h1 class="brand">${cat.nome}</h1>`;
+    if (!temAgenda) {
+      h += `<section class="empty"><h2>Nenhuma ficha ainda</h2></section>`;
+    } else {
+      h += `<div class="choices">`;
+      DIAS.forEach(([d]) => {
+        const r = ag[d], t = d === hoje ? '<span class="tag">Hoje</span>' : '';
+        if (r) h += `<button class="dayrow${d === hoje ? ' today' : ''}" data-dia="${d}"><span class="dn">${NOMES[d]}${t}</span><span class="rn">${rotinas[r].nome}</span>${seta}</button>`;
+        else h += `<div class="dayrow off${d === hoje ? ' today' : ''}"><span class="dn">${NOMES[d]}${t}</span><span class="rn">Livre</span></div>`;
+      });
+      h += `</div>`;
+    }
+  }
+
+  else if (state.tela === 'rotina') {
+    const quando = (state.dia === hoje ? 'Hoje, ' + NOMES[state.dia].toLowerCase() : NOMES[state.dia]);
+    h += `<div class="top">${voltar(config.diaAtual ? 'Início' : cat.nome)}${temAgenda ? `<button class="daybtn" data-semana="1">Trocar dia</button>` : ''}</div>`;
+    if (!temAgenda) {
+      h += `<h1 class="brand">${cat.nome}</h1><section class="empty"><h2>Nenhuma ficha ainda</h2></section>`;
+    } else if (!rid) {
+      h += `<section class="routine"><div class="hero">${dataBloco()}</div><h1 class="brand">Dia livre</h1></section>`;
+    } else {
+      const falta = ids.reduce((t, id) => t + (feitos.includes(id) ? 0 : exercicios[id].min), 0);
+      const prox = ids.find(id => !feitos.includes(id));
+      const C = 2 * Math.PI * 32, frac = feitos.length / ids.length;
+      h += `<section class="routine"><div class="hero">${dataBloco()}<svg class="ring" viewBox="0 0 76 76" role="img" aria-label="${feitos.length} de ${ids.length} exercícios feitos"><circle class="trk" cx="38" cy="38" r="32"/><circle class="arc" cx="38" cy="38" r="32" stroke-dasharray="${C * frac} ${C}" transform="rotate(-90 38 38)"/><text x="38" y="43" text-anchor="middle">${feitos.length}/${ids.length}</text></svg></div>`;
+      h += `<h1 class="brand">${rotinas[rid].nome}</h1><p class="eyebrow">${prox ? 'Faltam ' + falta + ' min' : 'Treino concluído'}${prox ? '' : ' · <button class="reset" data-reset="1">Recomeçar</button>'}</p>`;
+      h += `<ol class="tl">`;
+      let faseAtual = '';
+      ids.forEach((id, i) => {
+        const e = exercicios[id], done = feitos.includes(id), fase = faseDe(id);
+        if (fase !== faseAtual) {
+          faseAtual = fase;
+          const m = ids.filter(x => faseDe(x) === fase).reduce((t, x) => t + exercicios[x].min, 0);
+          h += `<li class="phase">${fase} · ${m} min</li>`;
+        }
+        h += `<li class="it${done ? ' done' : ''}${id === prox ? ' next' : ''}"><div class="rail"><button class="check" data-check="${id}" aria-pressed="${done}" aria-label="${done ? 'Desmarcar' : 'Marcar como feito'}: ${e.nome}">${done ? '✓' : i + 1}</button></div>`;
+        h += `<button class="body" data-ex="${id}">${id === prox ? '<span class="tag">A seguir</span>' : ''}<span class="name">${e.nome}</span><span class="meta">${e.min} min</span></button></li>`;
+      });
+      h += `</ol></section>`;
+    }
+  }
+
+  else if (state.tela === 'exercicio') {
+    const e = exercicios[state.ex], done = feitos.includes(state.ex), pos = ids.indexOf(state.ex);
+    const prox = ids.slice(pos + 1).find(id => !feitos.includes(id)) || ids.find(id => id !== state.ex && !feitos.includes(id));
+    h += `<div class="top">${voltar(rotinas[rid].nome)}<span class="count">${pos + 1} de ${ids.length}</span></div>`;
+    h += `<div class="segs" aria-hidden="true">${ids.map(id => `<i class="${id === state.ex ? 'cur' : feitos.includes(id) ? 'ok' : ''}"></i>`).join('')}</div>`;
+    h += `<section class="routine"><h1 class="brand">${e.nome}</h1><div class="chips"><span>${e.min} min</span>${e.bpm ? `<span>${e.bpm}</span>` : ''}<span>${faseDe(state.ex)}</span></div>`;
+    if (e.fig) h += `<div class="fig big">${e.fig.tipo === 'tab' ? tab(e.fig.seg) : braco(e.fig.lo, e.fig.hi)}</div>`;
+    h += `<ol class="passos">${e.passos.map(p => `<li>${p}</li>`).join('')}</ol></section>`;
+    h += `<div class="dock"><a class="vid" href="${yt(e.busca)}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>${e.rotulo ? 'Base' : 'Vídeo'}</a>`;
+    h += done
+      ? `<button class="feito off" data-feito="1"><b>Desmarcar</b><small>Já está marcado como feito</small></button></div>`
+      : `<button class="feito" data-feito="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Feito</b><small>${prox ? 'Próximo: ' + exercicios[prox].nome : 'Concluir treino'}</small></span></button></div>`;
+  }
+
+  app.className = 'app' + (state.tela === 'exercicio' ? ' tela-ex' : '');
+  app.innerHTML = h;
+}
+
+function ir(tela) { state.tela = tela; try { window.scrollTo(0, 0); } catch (e) {} }
+
+app.addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  const d = b.dataset;
+  const rid = (agenda[state.cat] || {})[state.dia];
+  const marcar = id => {
+    const f = state.feitos[rid] || (state.feitos[rid] = []);
+    const i = f.indexOf(id);
+    if (i >= 0) { f.splice(i, 1); salvar(); return false; }
+    f.push(id); salvar(); return true;
+  };
+  if (d.back) ir({ config:'inicio', semana:'inicio', rotina: config.diaAtual ? 'inicio' : 'semana', exercicio:'rotina' }[state.tela]);
+  else if (d.config) ir('config');
+  else if (d.toggle) { config[d.toggle] = !config[d.toggle]; salvarConfig(); }
+  else if (d.cat) { state.cat = d.cat; state.dia = hoje; ir(config.diaAtual ? 'rotina' : 'semana'); }
+  else if (d.semana) ir('semana');
+  else if (d.dia !== undefined) { state.dia = +d.dia; ir('rotina'); }
+  else if (d.ex) { state.ex = d.ex; ir('exercicio'); }
+  else if (d.check) marcar(d.check);
+  else if (d.feito) {
+    if (marcar(state.ex)) {
+      const ids = rotina_exercicios[rid], f = state.feitos[rid], pos = ids.indexOf(state.ex);
+      const prox = ids.slice(pos + 1).find(id => !f.includes(id)) || ids.find(id => !f.includes(id));
+      if (prox) { state.ex = prox; ir('exercicio'); } else ir('rotina');
+    }
+  }
+  else if (d.reset) { state.feitos[rid] = []; salvar(); }
+  else return;
+  render();
+});
+
+render();
+
+// funciona offline depois da primeira visita
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+</script>
+</body>
+</html>
