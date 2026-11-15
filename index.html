@@ -235,6 +235,19 @@ button.vid{cursor:pointer}
 .toast span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .toast button{flex:none;padding:10px 12px;border-radius:10px;font-weight:700;color:var(--bg)}
 .toast button[data-undo]{background:var(--accent);color:var(--accent-ink)}
+
+.tools{display:flex;flex-wrap:wrap;gap:8px}
+.tools:empty{display:none}
+.tools .grupo{display:flex;gap:8px}
+.tool{display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 16px 0 12px;border-radius:14px;background:var(--surface);font-family:var(--display);font-weight:700;font-size:19px;font-variant-numeric:tabular-nums}
+.tool svg{width:20px;height:20px;color:var(--accent)}
+.tool.sm{width:48px;padding:0;justify-content:center;color:var(--muted)}
+.tool.on{background:var(--accent);color:var(--accent-ink)}
+.tool.on svg{color:var(--accent-ink)}
+.tool.fim{background:var(--good);color:var(--bg)}
+.tool.fim svg{color:var(--bg)}
+.nota{margin-top:8px}
+.nota textarea{background:transparent}
 </style>
 </head>
 <body>
@@ -337,9 +350,9 @@ const salvarDados = () => gravar('pg-dados-v1', { categorias, exercicios, rotina
 
 const DIAS = [[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[0,'Dom']];
 const hoje = new Date().getDay();
-const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, editR:null, editE:null, voltaEx:'gerir', voltaRot:'gerir', voltaGerir:'semana', editando:false, player:false, confirma:null, aviso:'', undo:null,
+const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, editR:null, editE:null, voltaEx:'gerir', voltaRot:'gerir', voltaGerir:'semana', editando:false, player:false, confirma:null, aviso:'', undo:null, colando:false,
   feitos: ler('pg-feitos-v2', {}) };   // feitos[data][rotina] = [exercícios]: cada data começa zerada
-const config = Object.assign({ diaAtual:true }, ler('pg-config-v1', {}));
+const config = Object.assign({ diaAtual:true, telaLigada:true, textoGrande:false }, ler('pg-config-v1', {}));
 const salvarConfig = () => gravar('pg-config-v1', config);
 const salvar = () => gravar('pg-feitos-v2', state.feitos);
 
@@ -467,6 +480,8 @@ function render() {
   else if (state.tela === 'config') {
     h += voltar('Início') + `<h1 class="brand">Configurações</h1>`;
     h += `<button class="setting" role="switch" aria-checked="${config.diaAtual}" data-toggle="diaAtual"><span class="st"><b>Abrir no dia de hoje</b><small>Desligado, você escolhe o dia sempre que entrar.</small></span><span class="sw"></span></button>`;
+    h += `<button class="setting" role="switch" aria-checked="${config.telaLigada}" data-toggle="telaLigada"><span class="st"><b>Manter a tela ligada</b><small>Durante o treino, o celular não apaga sozinho.</small></span><span class="sw"></span></button>`;
+    h += `<button class="setting" role="switch" aria-checked="${config.textoGrande}" data-toggle="textoGrande"><span class="st"><b>Texto maior</b><small>Aumenta tudo, para ler com o celular mais longe.</small></span><span class="sw"></span></button>`;
     h += `<h2 class="sec">Cópia de segurança</h2><p class="eyebrow">Guarda em um arquivo tudo o que você cadastrou. Importar substitui os dados atuais.</p>`;
     h += `<div class="rowsel"><button class="btn ghost grow" data-exportar="1">Exportar</button><label class="btn ghost grow" for="impArq">Importar</label></div><input id="impArq" type="file" accept="application/json,.json" class="oculto">`;
     if (state.aviso) h += `<p class="aviso ok">${esc(state.aviso)}</p>`;
@@ -516,17 +531,20 @@ function render() {
   }
 
   else if (state.tela === 'exercicio') {
+    prepararEx();
     const e = exercicios[state.ex], done = feitos.includes(state.ex), ix = ids.indexOf(state.ex);
     const prox = ids.slice(ix + 1).find(id => !feitos.includes(id)) || ids.find(id => id !== state.ex && !feitos.includes(id));
     const vid = ytId(e.video), passos = e.passos || [];
     h += `<div class="top">${voltar(rotinas[rid].nome)}<span class="count">${ix + 1} de ${ids.length}</span><button class="daybtn" data-edite="${state.ex}">Editar</button></div>`;
     h += `<div class="segs" aria-hidden="true">${ids.map(id => `<i class="${id === state.ex ? 'cur' : feitos.includes(id) ? 'ok' : ''}"></i>`).join('')}</div>`;
-    h += `<section class="routine"><h1 class="brand">${esc(e.nome)}</h1><div class="chips">${[e.min ? e.min + ' min' : '', e.bpm, ids.some(x => faseDe(x) !== faseDe(state.ex)) ? faseDe(state.ex) : ''].filter(Boolean).map(t => `<span>${esc(t)}</span>`).join('')}</div>`;
+    h += `<section class="routine"><h1 class="brand">${esc(e.nome)}</h1><div class="chips">${[!T.total && e.min ? e.min + ' min' : '', e.bpm, ids.some(x => faseDe(x) !== faseDe(state.ex)) ? faseDe(state.ex) : ''].filter(Boolean).map(t => `<span>${esc(t)}</span>`).join('')}</div>`;
+    h += `<div class="tools" id="tools">${toolsHTML()}</div>`;
     if (state.player && vid) h += `<div class="player"><iframe src="https://www.youtube-nocookie.com/embed/${vid}?autoplay=1" title="Vídeo de referência" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
     if (e.imagem) h += `<div class="foto"><img src="${e.imagem}" alt="Imagem de referência"></div>`;
     else if (ehImagem(e.video)) h += `<div class="foto"><img src="${esc(e.video)}" alt="Imagem de referência"></div>`;
     if (e.fig) h += `<div class="fig big">${e.fig.tipo === 'tab' ? tab(e.fig.seg) : braco(e.fig.lo, e.fig.hi)}</div>`;
     if (passos.length) h += `<ol class="passos">${passos.map(p => `<li>${esc(p)}</li>`).join('')}</ol>`;
+    h += `<div class="field nota"><label for="exNota">Anotações</label><textarea id="exNota" data-f="exNota" rows="2" placeholder="Ex.: banco na posição 4, subir a carga na próxima">${esc(e.nota)}</textarea></div>`;
     h += `</section><div class="dock">`;
     const play = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>';
     if (vid) h += `<button class="vid" data-player="1">${play}${state.player ? 'Fechar' : 'Vídeo'}</button>`;
@@ -562,6 +580,8 @@ function render() {
     lista.forEach((x, i) => h += `<div class="ordem"><button class="on" data-edite="${x}"><span class="n">${i + 1}</span>${esc(exercicios[x].nome)}</button><button class="mini" data-sobe="${i}" aria-label="Subir"${i ? '' : ' disabled'}>↑</button><button class="mini" data-desce="${i}" aria-label="Descer"${i < lista.length - 1 ? '' : ' disabled'}>↓</button><button class="mini" data-tira="${i}" aria-label="Tirar da rotina">✕</button></div>`);
     if (es.length) h += `<div class="rowsel"><select id="addSel" aria-label="Exercício para adicionar">${es.map(x => `<option value="${x}">${esc(exercicios[x].nome)}</option>`).join('')}</select><button class="btn ghost" data-addex="1">Adicionar</button></div>`;
     h += `<button class="add" data-novoe="1">+ Novo exercício</button>`;
+    if (state.colando) h += `<div class="field"><label for="colaTxt">Um exercício por linha. Para incluir o detalhe, use um traço: Leg press - 3x12</label><textarea id="colaTxt" rows="6" placeholder="Leg press - 3x12\nCadeira extensora - 3x15\nPanturrilha"></textarea><button class="btn primary" data-colar="1">Adicionar todos</button></div>`;
+    else h += `<button class="add" data-colarabrir="1">Colar uma lista de exercícios</button>`;
     h += `<button class="btn ghost dup" data-duplicar="rot">Duplicar rotina</button>` + excluir('rot', 'Excluir rotina') + `</div>`;
   }
 
@@ -583,6 +603,8 @@ function render() {
   if (state.undo) h += `<div class="toast" role="status"><span>${esc(state.undo.txt)}</span><button data-undo="1">Desfazer</button><button data-fechatoast="1" aria-label="Fechar aviso">✕</button></div>`;
   app.className = 'app' + (state.tela === 'exercicio' ? ' tela-ex' : '');
   app.innerHTML = h;
+  try { document.body.style.zoom = config.textoGrande ? '1.15' : ''; } catch (e) {}
+  telaLigada(emTreino());
 }
 
 // guarda uma cópia dos dados antes de apagar; o aviso com "Desfazer" some sozinho
@@ -605,7 +627,94 @@ function apagarRot(id) {
   for (const c in agenda) for (const dia in agenda[c]) if (agenda[c][dia] === id) agenda[c][dia] = null;
 }
 
-function ir(tela) { state.tela = tela; state.confirma = null; state.player = false; state.aviso = ''; try { window.scrollTo(0, 0); } catch (e) {} }
+/* ---------- FERRAMENTAS DO TREINO ---------- */
+const playIc = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>';
+const pausaIc = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>';
+const fmt = seg => String(Math.floor(seg / 60)).padStart(2, '0') + ':' + String(seg % 60).padStart(2, '0');
+const bpmDe = txt => { const m = String(txt || '').match(/(\d{2,3})\s*(?:[–-]\s*\d{2,3}\s*)?bpm/i); return m ? +m[1] : 0; };
+
+// cronômetro: guarda a hora em que termina, para não atrasar com a tela apagada
+let T = { ex:null, total:0, restante:0, fim:null };
+const restanteAgora = () => T.fim ? Math.max(0, Math.ceil((T.fim - Date.now()) / 1000)) : T.restante;
+
+// metrônomo: os cliques são agendados no relógio do áudio, que é preciso
+let ac = null;
+const metro = { on:false, bpm:0, prox:0, timer:null };
+function audio() {
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) { ac = null; }
+  return ac;
+}
+function bip(t, freq, dur, vol) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function iniciarMetro() {
+  if (!audio()) return;
+  metro.on = true; metro.prox = ac.currentTime + 0.06;
+  clearInterval(metro.timer);
+  metro.timer = setInterval(() => { while (metro.prox < ac.currentTime + 0.15) { bip(metro.prox, 1000, 0.05, 0.5); metro.prox += 60 / metro.bpm; } }, 25);
+}
+function pararMetro() { metro.on = false; clearInterval(metro.timer); }
+function alarme() {
+  try { if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]); } catch (e) {}
+  try { if (audio()) [0, 0.25, 0.5].forEach(d => bip(ac.currentTime + 0.05 + d, 880, 0.15, 0.4)); } catch (e) {}
+}
+function prepararEx() {
+  if (T.ex === state.ex) return;
+  const e = exercicios[state.ex], seg = (+e.min || 0) * 60;
+  T = { ex: state.ex, total: seg, restante: seg, fim: null };
+  pararMetro();
+  metro.bpm = e.bpmUlt || bpmDe(e.bpm) || 0;
+}
+function toolsHTML() {
+  let h = '';
+  if (T.total > 0) {
+    const run = !!T.fim;
+    h += `<button class="tool${run ? ' on' : ''}${!run && T.restante === 0 ? ' fim' : ''}" data-timer="1" aria-label="${run ? 'Pausar' : 'Iniciar'} cronômetro">${run ? pausaIc : playIc}<span id="tmr">${fmt(restanteAgora())}</span></button>`;
+    if (run || T.restante !== T.total) h += `<button class="tool sm" data-timerreset="1" aria-label="Zerar cronômetro">↺</button>`;
+  }
+  if (metro.bpm) {
+    h += `<span class="grupo"><button class="tool${metro.on ? ' on' : ''}" data-metro="1" aria-label="${metro.on ? 'Parar' : 'Tocar'} metrônomo">${metro.on ? pausaIc : playIc}<span>${metro.bpm} bpm</span></button>`;
+    h += `<button class="tool sm" data-bpm="-5" aria-label="Diminuir 5 bpm">−</button><button class="tool sm" data-bpm="5" aria-label="Aumentar 5 bpm">+</button></span>`;
+  }
+  return h;
+}
+function atualizarTools() { const el = document.getElementById('tools'); if (el) el.innerHTML = toolsHTML(); }
+setInterval(() => {
+  if (!T.fim) return;
+  const r = restanteAgora(), el = document.getElementById('tmr');
+  if (el) el.textContent = fmt(r);
+  if (r <= 0) { T.fim = null; T.restante = 0; alarme(); atualizarTools(); }
+}, 400);
+
+// tela ligada durante o treino
+let trava = null;
+async function telaLigada(on) {
+  try {
+    if (on && !trava && navigator.wakeLock) { trava = await navigator.wakeLock.request('screen'); trava.addEventListener('release', () => { trava = null; }); }
+    else if (!on && trava) { const t = trava; trava = null; await t.release(); }
+  } catch (e) { trava = null; }
+}
+const emTreino = () => config.telaLigada && (state.tela === 'rotina' || state.tela === 'exercicio');
+
+// botão voltar do Android: mantém uma entrada extra no histórico enquanto não se está no Início
+let armadilha = false, ignorarPop = false;
+const alvoVoltar = () => ({ config:'inicio', semana:'inicio', rotina: config.diaAtual ? 'inicio' : 'semana', exercicio:'rotina', gerir: state.voltaGerir, editRotina: state.voltaRot, editEx: state.voltaEx }[state.tela] || 'inicio');
+
+function ir(tela) {
+  state.tela = tela; state.confirma = null; state.player = false; state.aviso = ''; state.colando = false;
+  if (tela !== 'exercicio') { T.ex = null; T.fim = null; pararMetro(); }
+  try {
+    if (tela !== 'inicio' && !armadilha) { history.pushState({ pg: 1 }, ''); armadilha = true; }
+    else if (tela === 'inicio' && armadilha) { armadilha = false; ignorarPop = true; history.back(); }
+  } catch (e) {}
+  try { window.scrollTo(0, 0); } catch (e) {}
+}
 
 app.addEventListener('click', ev => {
   const b = ev.target.closest('button');
@@ -619,9 +728,23 @@ app.addEventListener('click', ev => {
     f.push(id); salvar(); return true;
   };
   const lista = rotina_exercicios[state.editR];
+  if (d.timer || d.timerreset || d.metro || d.bpm) {
+    if (d.timer) {
+      if (T.fim) { T.restante = restanteAgora(); T.fim = null; }
+      else { if (T.restante <= 0) T.restante = T.total; T.fim = Date.now() + T.restante * 1000; audio(); }
+    }
+    else if (d.timerreset) { T.fim = null; T.restante = T.total; }
+    else if (d.metro) { if (metro.on) pararMetro(); else iniciarMetro(); }
+    else if (d.bpm) {
+      metro.bpm = Math.min(240, Math.max(30, metro.bpm + (+d.bpm)));
+      if (exercicios[state.ex]) { exercicios[state.ex].bpmUlt = metro.bpm; salvarDados(); }
+    }
+    atualizarTools();
+    return;
+  }
   if (!d.del && !d.delitem) state.confirma = null;
 
-  if (d.back) ir({ config:'inicio', semana:'inicio', rotina: config.diaAtual ? 'inicio' : 'semana', exercicio:'rotina', gerir: state.voltaGerir, editRotina: state.voltaRot, editEx: state.voltaEx }[state.tela]);
+  if (d.back) ir(alvoVoltar());
   else if (d.config) ir('config');
   else if (d.toggle) { config[d.toggle] = !config[d.toggle]; salvarConfig(); }
   else if (d.modoedit) state.editando = !state.editando;
@@ -663,6 +786,19 @@ app.addEventListener('click', ev => {
     exercicios[id] = { nome:'Novo exercício', min:5, passos:[], cat: state.cat };
     if (state.tela === 'editRotina') lista.push(id);
     state.editE = id; state.voltaEx = state.tela; salvarDados(); ir('editEx');
+  }
+  else if (d.colarabrir) state.colando = !state.colando;
+  else if (d.colar) {
+    const campo = document.getElementById('colaTxt'), cat = rotinas[state.editR].categoria;
+    String((campo && campo.value) || '').split('\n').forEach(linha => {
+      const partes = linha.split(/\s+[-–—]\s+|;\s*|\t+/).map(x => x.trim()).filter(Boolean);
+      if (!partes.length) return;
+      const nome = partes[0], det = partes.slice(1).join(' · ');
+      let id = exDaCat(cat).find(x => exercicios[x].nome.toLowerCase() === nome.toLowerCase());
+      if (!id) { id = novoId(); exercicios[id] = { nome, min: 5, bpm: det, passos: [], cat }; }
+      lista.push(id);
+    });
+    state.colando = false; salvarDados();
   }
   else if (d.sobe) { const i = +d.sobe; [lista[i - 1], lista[i]] = [lista[i], lista[i - 1]]; salvarDados(); }
   else if (d.desce) { const i = +d.desce; [lista[i + 1], lista[i]] = [lista[i], lista[i + 1]]; salvarDados(); }
@@ -761,6 +897,7 @@ app.addEventListener('change', ev => {
     });
     return;
   }
+  if (d.f === 'exNota') { if (exercicios[state.ex]) { exercicios[state.ex].nota = v; salvarDados(); } return; }
   if (d.agenda !== undefined) { (agenda[state.cat] || (agenda[state.cat] = {}))[d.agenda] = v || null; }
   else if (d.f === 'catNome') { if (v) categorias.find(c => c.id === state.cat).nome = v; }
   else if (d.f === 'rotNome') { if (v) rotinas[state.editR].nome = v; }
@@ -774,6 +911,15 @@ app.addEventListener('change', ev => {
 });
 
 render();
+
+if (window.addEventListener) {
+  window.addEventListener('popstate', () => {
+    if (ignorarPop) { ignorarPop = false; return; }
+    armadilha = false;
+    if (state.tela !== 'inicio') { ir(alvoVoltar()); render(); }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') telaLigada(emTreino()); });
+}
 
 // funciona offline depois da primeira visita
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
