@@ -214,6 +214,20 @@ input::placeholder{color:var(--muted);opacity:.7}
 .tile .letra{flex:1;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:64px;color:var(--muted)}
 .empty .btn{align-self:flex-start;margin-top:8px}
 button.vid{cursor:pointer}
+
+.acts{display:flex;align-items:center;gap:8px}
+.tile{position:relative}
+.badge{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.badge svg{width:16px;height:16px;flex:none}
+.ordem .on{align-items:center}
+.ordem .grow{flex:1;min-width:0}
+.ordem .on .n{font-weight:500;font-size:13px}
+.mini{display:grid;place-items:center}
+.mini svg{width:18px;height:18px}
+.mini.sure{width:auto;padding:0 12px;background:var(--bad);color:var(--bg);font-size:13px}
+.danger{align-self:stretch;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:22px;padding:13px;border:1.5px solid var(--bad);border-radius:14px}
+.danger svg{width:18px;height:18px}
+.danger.sure{background:var(--bad);color:var(--bg)}
 </style>
 </head>
 <body>
@@ -313,7 +327,7 @@ const salvarDados = () => gravar('pg-dados-v1', { categorias, exercicios, rotina
 
 const DIAS = [[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[0,'Dom']];
 const hoje = new Date().getDay();
-const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, editR:null, editE:null, voltaEx:'gerir', player:false, confirma:null, aviso:'',
+const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, editR:null, editE:null, voltaEx:'gerir', voltaRot:'gerir', voltaGerir:'semana', editando:false, player:false, confirma:null, aviso:'',
   feitos: ler('pg-feitos-v2', {}) };   // feitos[data][rotina] = [exercícios]: cada data começa zerada
 const config = Object.assign({ diaAtual:true }, ler('pg-config-v1', {}));
 const salvarConfig = () => gravar('pg-config-v1', config);
@@ -406,11 +420,16 @@ const ARTE = {
   musica: '<svg viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(35 60 60)"><rect x="53" y="8" width="14" height="14" rx="3" fill="var(--ink)"/><rect x="56" y="20" width="8" height="46" fill="var(--muted)"/><circle cx="60" cy="62" r="17" fill="var(--accent)"/><circle cx="60" cy="86" r="25" fill="var(--accent)"/><circle cx="60" cy="72" r="7" fill="var(--bg)"/><rect x="50" y="93" width="20" height="4" rx="2" fill="var(--accent-ink)"/><path d="M58 12V94M60 12V94M62 12V94" stroke="var(--ink)" stroke-width=".7" opacity=".8"/></g></svg>',
   musculacao: '<svg viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(-25 60 60)"><rect x="30" y="56" width="60" height="8" rx="4" fill="var(--muted)"/><rect x="28" y="36" width="13" height="48" rx="5" fill="var(--good)"/><rect x="79" y="36" width="13" height="48" rx="5" fill="var(--good)"/><rect x="15" y="44" width="10" height="32" rx="4" fill="var(--ink)"/><rect x="95" y="44" width="10" height="32" rx="4" fill="var(--ink)"/></g></svg>'
 };
+const lapis = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
+const lixo = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg>';
+const apagarItem = (chave, nome) => state.confirma === chave
+  ? `<button class="mini sure" data-delitem="${chave}">Apagar?</button>`
+  : `<button class="mini" data-delitem="${chave}" aria-label="Apagar ${esc(nome)}">${lixo}</button>`;
 const NOMES = {1:'Segunda',2:'Terça',3:'Quarta',4:'Quinta',5:'Sexta',6:'Sábado',0:'Domingo'};
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const faseDe = id => exercicios[id].fase || 'Prática';
 const voltar = txt => `<button class="back" data-back="1">‹ ${esc(txt)}</button>`;
-const excluir = (tipo, txt) => `<button class="danger" data-del="${tipo}">${state.confirma === tipo ? 'Toque de novo para confirmar' : txt}</button>`;
+const excluir = (tipo, txt) => `<button class="danger${state.confirma === tipo ? ' sure' : ''}" data-del="${tipo}">${lixo}${state.confirma === tipo ? 'Toque de novo para apagar' : txt}</button>`;
 
 function dataBloco() {
   const dt = dataDe(state.dia);
@@ -428,9 +447,11 @@ function render() {
   let h = '';
 
   if (state.tela === 'inicio') {
-    h += `<div class="top"><h1 class="brand">O que vamos praticar?</h1><button class="icon" data-config="1" aria-label="Configurações">${engrenagem}</button></div><div class="tiles">`;
-    categorias.forEach(c => h += `<button class="tile ${esc(c.id)}" data-cat="${esc(c.id)}">${ARTE[c.id] || `<span class="letra">${esc(c.nome.charAt(0).toUpperCase())}</span>`}<span>${esc(c.nome)}</span></button>`);
-    h += `<button class="tile nova" data-novacat="1" aria-label="Nova categoria"><span class="letra">+</span><span>Nova</span></button></div>`;
+    if (state.editando) h += `<div class="top"><h1 class="brand">Toque no que quer editar</h1><button class="daybtn" data-modoedit="1">Concluir</button></div><div class="tiles">`;
+    else h += `<div class="top"><h1 class="brand">O que vamos praticar?</h1><span class="acts"><button class="icon" data-modoedit="1" aria-label="Editar">${lapis}</button><button class="icon" data-config="1" aria-label="Configurações">${engrenagem}</button></span></div><div class="tiles">`;
+    categorias.forEach(c => h += `<button class="tile ${esc(c.id)}" data-cat="${esc(c.id)}">${state.editando ? `<i class="badge">${lapis}</i>` : ''}${ARTE[c.id] || `<span class="letra">${esc(c.nome.charAt(0).toUpperCase())}</span>`}<span>${esc(c.nome)}</span></button>`);
+    if (state.editando || !categorias.length) h += `<button class="tile nova" data-novacat="1" aria-label="Nova categoria"><span class="letra">+</span><span>Nova</span></button>`;
+    h += `</div>`;
   }
 
   else if (state.tela === 'config') {
@@ -453,7 +474,7 @@ function render() {
   }
 
   else if (state.tela === 'rotina') {
-    h += `<div class="top">${voltar(config.diaAtual ? 'Início' : cat.nome)}${temAgenda ? `<button class="daybtn" data-semana="1">Trocar dia</button>` : ''}</div>`;
+    h += `<div class="top">${voltar(config.diaAtual ? 'Início' : cat.nome)}<span class="acts">${rid ? `<button class="icon" data-editr="${rid}" aria-label="Editar esta rotina">${lapis}</button>` : ''}${temAgenda ? `<button class="daybtn" data-semana="1">Trocar dia</button>` : ''}</span></div>`;
     if (!temAgenda) h += `<h1 class="brand">${esc(cat.nome)}</h1>` + vazio;
     else if (!rid) h += `<section class="routine"><div class="hero">${dataBloco()}</div><h1 class="brand">Dia livre</h1></section>`;
     else {
@@ -505,24 +526,24 @@ function render() {
 
   else if (state.tela === 'gerir') {
     const rs = rotDaCat(state.cat), es = exDaCat(state.cat);
-    h += voltar(cat.nome) + `<h1 class="brand">Editar</h1><div class="form">`;
+    h += voltar('Voltar') + `<h1 class="brand">Editar ${esc(cat.nome)}</h1><div class="form">`;
     h += `<div class="field"><label for="catNome">Nome da categoria</label><input id="catNome" data-f="catNome" value="${esc(cat.nome)}"></div>`;
     h += `<h2 class="sec">Rotinas</h2>`;
-    rs.forEach(r => h += `<button class="dayrow" data-editr="${r}"><span class="dn">${esc(rotinas[r].nome)}</span><span class="rn">${idsDe(r).length} exerc.</span>${seta}</button>`);
+    rs.forEach(r => h += `<div class="ordem"><button class="on" data-editr="${r}"><span class="grow">${esc(rotinas[r].nome)}</span><span class="n">${idsDe(r).length} exerc.</span></button>${apagarItem('rot:' + r, rotinas[r].nome)}</div>`);
     h += `<button class="add" data-novar="1">+ Nova rotina</button>`;
     if (rs.length) {
       h += `<h2 class="sec">Semana</h2>`;
       DIAS.forEach(([d]) => h += `<div class="rowsel"><label for="ag${d}">${NOMES[d]}</label><select id="ag${d}" data-agenda="${d}"><option value="">Livre</option>${rs.map(r => `<option value="${r}"${ag[d] === r ? ' selected' : ''}>${esc(rotinas[r].nome)}</option>`).join('')}</select></div>`);
     }
     h += `<h2 class="sec">Exercícios</h2>`;
-    es.forEach(x => h += `<button class="dayrow" data-edite="${x}"><span class="dn">${esc(exercicios[x].nome)}</span>${seta}</button>`);
+    es.forEach(x => h += `<div class="ordem"><button class="on" data-edite="${x}"><span class="grow">${esc(exercicios[x].nome)}</span></button>${apagarItem('ex:' + x, exercicios[x].nome)}</div>`);
     h += `<button class="add" data-novoe="1">+ Novo exercício</button>`;
     h += excluir('cat', 'Excluir categoria') + `</div>`;
   }
 
   else if (state.tela === 'editRotina') {
     const r = rotinas[state.editR], lista = idsDe(state.editR), es = exDaCat(r.categoria);
-    h += voltar('Editar') + `<h1 class="brand">Rotina</h1><div class="form">`;
+    h += voltar('Voltar') + `<h1 class="brand">Editar rotina</h1><div class="form">`;
     h += `<div class="field"><label for="rotNome">Nome</label><input id="rotNome" data-f="rotNome" value="${esc(r.nome)}"></div>`;
     h += `<h2 class="sec">Exercícios, na ordem</h2>`;
     lista.forEach((x, i) => h += `<div class="ordem"><button class="on" data-edite="${x}"><span class="n">${i + 1}</span>${esc(exercicios[x].nome)}</button><button class="mini" data-sobe="${i}" aria-label="Subir"${i ? '' : ' disabled'}>↑</button><button class="mini" data-desce="${i}" aria-label="Descer"${i < lista.length - 1 ? '' : ' disabled'}>↓</button><button class="mini" data-tira="${i}" aria-label="Tirar da rotina">✕</button></div>`);
@@ -533,7 +554,7 @@ function render() {
 
   else if (state.tela === 'editEx') {
     const e = exercicios[state.editE];
-    h += voltar('Voltar') + `<h1 class="brand">Exercício</h1><div class="form">`;
+    h += voltar('Voltar') + `<h1 class="brand">Editar exercício</h1><div class="form">`;
     h += `<div class="field"><label for="exNome">Nome</label><input id="exNome" data-f="exNome" value="${esc(e.nome)}"></div>`;
     h += `<div class="duo"><div class="field"><label for="exMin">Minutos</label><input id="exMin" data-f="exMin" type="number" min="0" inputmode="numeric" value="${esc(e.min)}"></div>`;
     h += `<div class="field"><label for="exDet">Detalhe</label><input id="exDet" data-f="exDet" placeholder="3x12 · 20 kg, 60 bpm" value="${esc(e.bpm)}"></div></div>`;
@@ -550,6 +571,15 @@ function render() {
   app.innerHTML = h;
 }
 
+function apagarEx(id) {
+  delete exercicios[id];
+  for (const r in rotina_exercicios) rotina_exercicios[r] = rotina_exercicios[r].filter(x => x !== id);
+}
+function apagarRot(id) {
+  delete rotinas[id]; delete rotina_exercicios[id];
+  for (const c in agenda) for (const dia in agenda[c]) if (agenda[c][dia] === id) agenda[c][dia] = null;
+}
+
 function ir(tela) { state.tela = tela; state.confirma = null; state.player = false; state.aviso = ''; try { window.scrollTo(0, 0); } catch (e) {} }
 
 app.addEventListener('click', ev => {
@@ -564,12 +594,17 @@ app.addEventListener('click', ev => {
     f.push(id); salvar(); return true;
   };
   const lista = rotina_exercicios[state.editR];
-  if (!d.del) state.confirma = null;
+  if (!d.del && !d.delitem) state.confirma = null;
 
-  if (d.back) ir({ config:'inicio', semana:'inicio', rotina: config.diaAtual ? 'inicio' : 'semana', exercicio:'rotina', gerir:'semana', editRotina:'gerir', editEx: state.voltaEx }[state.tela]);
+  if (d.back) ir({ config:'inicio', semana:'inicio', rotina: config.diaAtual ? 'inicio' : 'semana', exercicio:'rotina', gerir: state.voltaGerir, editRotina: state.voltaRot, editEx: state.voltaEx }[state.tela]);
   else if (d.config) ir('config');
   else if (d.toggle) { config[d.toggle] = !config[d.toggle]; salvarConfig(); }
-  else if (d.cat) { state.cat = d.cat; state.dia = hoje; ir(config.diaAtual ? 'rotina' : 'semana'); }
+  else if (d.modoedit) state.editando = !state.editando;
+  else if (d.cat) {
+    state.cat = d.cat; state.dia = hoje;
+    if (state.editando) { state.voltaGerir = 'inicio'; ir('gerir'); }
+    else ir(config.diaAtual ? 'rotina' : 'semana');
+  }
   else if (d.semana) ir('semana');
   else if (d.dia !== undefined) { state.dia = +d.dia; ir('rotina'); }
   else if (d.ex) { state.ex = d.ex; ir('exercicio'); }
@@ -585,17 +620,17 @@ app.addEventListener('click', ev => {
   else if (d.reset) { feitosDe(rid, true).length = 0; salvar(); }
 
   // ----- edição
-  else if (d.gerir) ir('gerir');
+  else if (d.gerir) { state.voltaGerir = state.tela; ir('gerir'); }
   else if (d.novacat) {
     const id = novoId();
     categorias.push({ id, nome:'Nova categoria' }); agenda[id] = {};
-    state.cat = id; salvarDados(); ir('gerir');
+    state.cat = id; state.voltaGerir = 'inicio'; salvarDados(); ir('gerir');
   }
-  else if (d.editr) { state.editR = d.editr; ir('editRotina'); }
+  else if (d.editr) { state.editR = d.editr; state.voltaRot = state.tela; ir('editRotina'); }
   else if (d.novar) {
     const id = novoId();
     rotinas[id] = { categoria: state.cat, nome:'Nova rotina' }; rotina_exercicios[id] = [];
-    state.editR = id; salvarDados(); ir('editRotina');
+    state.editR = id; state.voltaRot = 'gerir'; salvarDados(); ir('editRotina');
   }
   else if (d.edite) { state.editE = d.edite; state.voltaEx = state.tela; ir('editEx'); }
   else if (d.novoe) {
@@ -609,23 +644,23 @@ app.addEventListener('click', ev => {
   else if (d.tira) { lista.splice(+d.tira, 1); salvarDados(); }
   else if (d.addex) { const sel = document.getElementById('addSel'); if (sel && exercicios[sel.value]) { lista.push(sel.value); salvarDados(); } }
   else if (d.delfoto) { delete exercicios[state.editE].imagem; salvarDados(); }
+  else if (d.delitem) {
+    if (state.confirma !== d.delitem) state.confirma = d.delitem;
+    else {
+      const [tipo, id] = d.delitem.split(':');
+      if (tipo === 'ex') apagarEx(id); else apagarRot(id);
+      state.confirma = null; salvarDados();
+    }
+  }
   else if (d.del) {
     if (state.confirma !== d.del) state.confirma = d.del;
     else {
-      if (d.del === 'ex') {
-        const id = state.editE;
-        delete exercicios[id];
-        for (const r in rotina_exercicios) rotina_exercicios[r] = rotina_exercicios[r].filter(x => x !== id);
-        ir(state.voltaEx === 'exercicio' ? 'rotina' : state.voltaEx);
-      } else if (d.del === 'rot') {
-        const id = state.editR;
-        delete rotinas[id]; delete rotina_exercicios[id];
-        for (const c in agenda) for (const dia in agenda[c]) if (agenda[c][dia] === id) agenda[c][dia] = null;
-        ir('gerir');
-      } else if (d.del === 'cat') {
+      if (d.del === 'ex') { apagarEx(state.editE); ir(state.voltaEx === 'exercicio' ? 'rotina' : state.voltaEx); }
+      else if (d.del === 'rot') { apagarRot(state.editR); ir(state.voltaRot); }
+      else if (d.del === 'cat') {
         const id = state.cat;
-        rotDaCat(id).forEach(r => { delete rotinas[r]; delete rotina_exercicios[r]; });
-        exDaCat(id).forEach(x => delete exercicios[x]);
+        rotDaCat(id).forEach(apagarRot);
+        exDaCat(id).forEach(apagarEx);
         delete agenda[id];
         categorias.splice(categorias.findIndex(c => c.id === id), 1);
         ir('inicio');
