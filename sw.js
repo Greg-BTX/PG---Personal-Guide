@@ -1,6 +1,6 @@
 // Service worker: guarda o app no aparelho para abrir sem internet.
 // Estratégia: tenta a rede primeiro (para pegar atualizações) e, sem conexão, usa a cópia guardada.
-const CACHE = 'pratica-guiada-v6';
+const CACHE = 'pratica-guiada-v7';
 const BASE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -17,6 +17,9 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // só o próprio app e as fontes passam pelo cache; chamadas à nuvem vão sempre direto à rede
+  const u = new URL(e.request.url);
+  if (u.origin !== self.location.origin && !/fonts\.(googleapis|gstatic)\.com$/.test(u.hostname)) return;
   e.respondWith(
     fetch(e.request)
       .then(r => {

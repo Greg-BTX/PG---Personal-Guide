@@ -376,7 +376,7 @@ const dadosValidos = d => d && Array.isArray(d.categorias) && d.exercicios && d.
 const salvo = ler('pg-dados-v1', null);
 if (dadosValidos(salvo)) aplicarDados(salvo);
 const foto = () => JSON.stringify({ categorias, exercicios, rotinas, rotina_exercicios, agenda });
-const salvarDados = () => gravar('pg-dados-v1', { categorias, exercicios, rotinas, rotina_exercicios, agenda });
+const salvarDados = () => { const ok = gravar('pg-dados-v1', { categorias, exercicios, rotinas, rotina_exercicios, agenda }); tocou(); return ok; };
 
 const DIAS = [[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[0,'Dom']];
 const hoje = new Date().getDay();
@@ -384,9 +384,9 @@ const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, editR:null, edit
   feitos: ler('pg-feitos-v2', {}) };   // feitos[data][rotina] = [exercícios]: cada data começa zerada
 const config = Object.assign({ diaAtual:true, telaLigada:true, textoGrande:false }, ler('pg-config-v1', {}));
 const salvarConfig = () => gravar('pg-config-v1', config);
-const salvar = () => gravar('pg-feitos-v2', state.feitos);
+const salvar = () => { gravar('pg-feitos-v2', state.feitos); tocou(); };
 state.log = ler('pg-log-v1', {});   // log[exercício][data] = [{ c: carga, r: repetições, ok }]
-const salvarLog = () => gravar('pg-log-v1', state.log);
+const salvarLog = () => { gravar('pg-log-v1', state.log); tocou(); };
 { const d = new Date(); state.mes = { y: d.getFullYear(), m: d.getMonth() }; state.histDia = null; }
 
 // data do dia escolhido, dentro da semana atual (segunda a domingo)
@@ -518,6 +518,14 @@ function render() {
     h += `<button class="setting" role="switch" aria-checked="${config.diaAtual}" data-toggle="diaAtual"><span class="st"><b>Abrir no dia de hoje</b><small>Desligado, você escolhe o dia sempre que entrar.</small></span><span class="sw"></span></button>`;
     h += `<button class="setting" role="switch" aria-checked="${config.telaLigada}" data-toggle="telaLigada"><span class="st"><b>Manter a tela ligada</b><small>Durante o treino, o celular não apaga sozinho.</small></span><span class="sw"></span></button>`;
     h += `<button class="setting" role="switch" aria-checked="${config.textoGrande}" data-toggle="textoGrande"><span class="st"><b>Texto maior</b><small>Aumenta tudo, para ler com o celular mais longe.</small></span><span class="sw"></span></button>`;
+    h += `<h2 class="sec">Conta e nuvem</h2>`;
+    if (sessao) {
+      h += `<p class="eyebrow">Conectado como <b>${esc(sessao.email)}</b>. ${esc(nuvem.status)}</p>`;
+      h += `<div class="rowsel"><button class="btn ghost grow" data-sync="1">Sincronizar agora</button><button class="btn ghost" data-sair="1">Sair</button></div>`;
+    } else {
+      h += `<p class="eyebrow">${esc(nuvem.status) || 'Entre com seu e-mail para guardar os dados na nuvem e usar em outros aparelhos. Não tem senha: você recebe um link.'}</p>`;
+      h += `<div class="field"><label for="nuvemEmail">E-mail</label><input id="nuvemEmail" type="email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com"></div><button class="btn primary" data-entrar="1">Enviar link de acesso</button>`;
+    }
     h += `<h2 class="sec">Cópia de segurança</h2><p class="eyebrow">Guarda em um arquivo tudo o que você cadastrou. Importar substitui os dados atuais.</p>`;
     h += `<div class="rowsel"><button class="btn ghost grow" data-exportar="1">Exportar</button><label class="btn ghost grow" for="impArq">Importar</label></div><input id="impArq" type="file" accept="application/json,.json" class="oculto">`;
     if (state.aviso) h += `<p class="aviso ok">${esc(state.aviso)}</p>`;
@@ -978,6 +986,23 @@ app.addEventListener('click', ev => {
     rotina_exercicios[id] = idsDe(state.editR).slice();
     state.editR = id; salvarDados(); ir('editRotina');
   }
+  else if (d.entrar) {
+    const campo = document.getElementById('nuvemEmail'), email = String((campo && campo.value) || '').trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) state.aviso = 'Digite um e-mail válido.';
+    else {
+      state.aviso = 'Enviando…';
+      api('/auth/v1/otp?redirect_to=' + encodeURIComponent(location.origin + location.pathname), { method: 'POST', body: JSON.stringify({ email, create_user: true }) })
+        .then(r => { state.aviso = r.ok ? 'Link enviado para ' + email + '. Abra o e-mail neste aparelho e toque no link.' : r.status === 429 ? 'Muitos pedidos seguidos. Espere um minuto e tente de novo.' : 'Não consegui enviar o link (erro ' + r.status + ').'; })
+        .catch(() => { state.aviso = 'Sem conexão. Tente de novo com internet.'; })
+        .then(() => { if (state.tela === 'config') render(); });
+    }
+  }
+  else if (d.sync) { nuvem.status = 'Sincronizando…'; sincronizar(); }
+  else if (d.sair) {
+    const tk = sessao && sessao.at;
+    if (tk) api('/auth/v1/logout', { method: 'POST' }, tk).catch(() => {});
+    encerrarSessao('Você saiu. Os dados continuam neste aparelho.');
+  }
   else if (d.exportar) {
     try {
       const blob = new Blob([JSON.stringify({ app:'pratica-guiada', versao:1, dados: JSON.parse(foto()), feitos: state.feitos, log: state.log, config }, null, 1)], { type:'application/json' });
@@ -1070,15 +1095,101 @@ app.addEventListener('change', ev => {
   salvarDados();
 });
 
+/* ---------- NUVEM (Supabase) ---------- */
+// A chave abaixo é pública por natureza: quem protege os dados é a regra do banco,
+// que só deixa cada pessoa ler e gravar a própria linha.
+const NUVEM = { url: 'https://grlayxznjcxsuwzdlhcx.supabase.co', chave: 'sb_publishable_NEn_etf1KarPW6jBhv03CQ_8tRrcxl0' };
+let sessao = ler('pg-sessao', null);
+const meta = ler('pg-sync', { alterado: 0 });   // hora da última alteração feita neste aparelho
+const nuvem = { status: '', ocupado: false, denovo: false, timer: null };
+
+function tocou() {
+  meta.alterado = Date.now(); gravar('pg-sync', meta);
+  if (sessao) { clearTimeout(nuvem.timer); nuvem.timer = setTimeout(sincronizar, 2500); }
+}
+function api(caminho, opt = {}, tk) {
+  return fetch(NUVEM.url + caminho, Object.assign({}, opt, { headers: Object.assign({ apikey: NUVEM.chave, 'Content-Type': 'application/json' }, tk ? { Authorization: 'Bearer ' + tk } : {}, opt.headers || {}) }));
+}
+function guardarSessao(o) {
+  const corpo = JSON.parse(atob(o.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  sessao = { at: o.access_token, rt: o.refresh_token, expira: Date.now() + (+o.expires_in || 3600) * 1000, uid: corpo.sub, email: corpo.email || '' };
+  gravar('pg-sessao', sessao);
+}
+function encerrarSessao(msg) { sessao = null; gravar('pg-sessao', null); clearTimeout(nuvem.timer); nuvem.status = msg || ''; }
+async function token() {
+  if (sessao.expira - 60000 > Date.now()) return sessao.at;
+  const r = await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: sessao.rt }) });
+  if (!r.ok) {
+    if (r.status >= 400 && r.status < 500) encerrarSessao('Sua sessão expirou. Entre de novo.');
+    throw new Error('sessao');
+  }
+  guardarSessao(await r.json());
+  return sessao.at;
+}
+function aplicarRemoto(r) {
+  if (dadosValidos(r.dados)) { aplicarDados(r.dados); gravar('pg-dados-v1', r.dados); }
+  for (const [alvo, fonte, chave] of [[state.feitos, r.feitos, 'pg-feitos-v2'], [state.log, r.log, 'pg-log-v1']]) {
+    Object.keys(alvo).forEach(k => delete alvo[k]);
+    Object.assign(alvo, fonte || {});
+    gravar(chave, alvo);
+  }
+}
+// Regra: vale a versão alterada por último. Se a da nuvem é mais nova, ela substitui a local; senão, a local sobe.
+async function sincronizar() {
+  if (!sessao) return;
+  if (nuvem.ocupado) { nuvem.denovo = true; return; }
+  if (navigator.onLine === false) { nuvem.status = 'Sem internet. Sincroniza quando a conexão voltar.'; return; }
+  nuvem.ocupado = true;
+  let puxou = false;
+  try {
+    const tk = await token();
+    const r = await api('/rest/v1/user_data?select=dados,feitos,log,alterado', {}, tk);
+    if (!r.ok) throw new Error('leitura ' + r.status);
+    const remoto = (await r.json())[0];
+    if (remoto && +remoto.alterado > meta.alterado) {
+      aplicarRemoto(remoto);
+      meta.alterado = +remoto.alterado; gravar('pg-sync', meta);
+      puxou = true;
+    } else if (!remoto || meta.alterado > +remoto.alterado) {
+      if (!meta.alterado) { meta.alterado = Date.now(); gravar('pg-sync', meta); }
+      const enviado = meta.alterado;
+      const w = await api('/rest/v1/user_data?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ user_id: sessao.uid, dados: JSON.parse(foto()), feitos: state.feitos, log: state.log, alterado: enviado, updated_at: new Date().toISOString() }) }, tk);
+      if (!w.ok) throw new Error('gravação ' + w.status);
+    }
+    nuvem.status = 'Sincronizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '.';
+  } catch (e) {
+    if (sessao) nuvem.status = 'Não consegui sincronizar agora. Seus dados continuam salvos neste aparelho.';
+  }
+  nuvem.ocupado = false;
+  if (puxou && !['inicio', 'config', 'historico'].includes(state.tela)) ir('inicio');
+  if (puxou || state.tela === 'config') render();
+  if (nuvem.denovo) { nuvem.denovo = false; sincronizar(); }
+}
+// volta do link enviado por e-mail: os dados da sessão chegam depois do # no endereço
+(function lerRetorno() {
+  try {
+    const h = location.hash.slice(1);
+    if (!/access_token=|error=/.test(h)) return;
+    const p = new URLSearchParams(h);
+    history.replaceState(null, '', location.pathname + location.search);
+    state.tela = 'config';
+    if (p.get('access_token')) guardarSessao({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token'), expires_in: p.get('expires_in') });
+    else state.aviso = 'Este link expirou ou já foi usado. Peça outro abaixo.';
+  } catch (e) {}
+})();
+
 render();
+sincronizar();
 
 if (window.addEventListener) {
+  window.addEventListener('online', sincronizar);
   window.addEventListener('popstate', () => {
     if (ignorarPop) { ignorarPop = false; return; }
     armadilha = false;
     if (state.tela !== 'inicio') { ir(alvoVoltar()); render(); }
   });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') telaLigada(emTreino()); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { telaLigada(emTreino()); sincronizar(); } });
 }
 
 // funciona offline depois da primeira visita
