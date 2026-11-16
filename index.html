@@ -525,6 +525,7 @@ function render() {
     } else {
       h += `<p class="eyebrow">${esc(nuvem.status) || 'Entre com seu e-mail para guardar os dados na nuvem e usar em outros aparelhos. Não tem senha: você recebe um link.'}</p>`;
       h += `<div class="field"><label for="nuvemEmail">E-mail</label><input id="nuvemEmail" type="email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com"></div><button class="btn primary" data-entrar="1">Enviar link de acesso</button>`;
+      if (nuvem.google) h += `<a class="btn ghost" href="${NUVEM.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(location.origin + location.pathname)}">Entrar com Google</a>`;
     }
     h += `<h2 class="sec">Cópia de segurança</h2><p class="eyebrow">Guarda em um arquivo tudo o que você cadastrou. Importar substitui os dados atuais.</p>`;
     h += `<div class="rowsel"><button class="btn ghost grow" data-exportar="1">Exportar</button><label class="btn ghost grow" for="impArq">Importar</label></div><input id="impArq" type="file" accept="application/json,.json" class="oculto">`;
@@ -906,7 +907,7 @@ app.addEventListener('click', ev => {
   if (!d.del && !d.delitem) state.confirma = null;
 
   if (d.back) ir(alvoVoltar());
-  else if (d.config) ir('config');
+  else if (d.config) { ir('config'); verProvedores(); }
   else if (d.hist) { const n = new Date(); state.mes = { y: n.getFullYear(), m: n.getMonth() }; state.histDia = chaveData(n); ir('historico'); }
   else if (d.mesnav) { const n = new Date(state.mes.y, state.mes.m + (+d.mesnav), 1); state.mes = { y: n.getFullYear(), m: n.getMonth() }; state.histDia = null; }
   else if (d.hd) state.histDia = d.hd;
@@ -1101,7 +1102,12 @@ app.addEventListener('change', ev => {
 const NUVEM = { url: 'https://grlayxznjcxsuwzdlhcx.supabase.co', chave: 'sb_publishable_NEn_etf1KarPW6jBhv03CQ_8tRrcxl0' };
 let sessao = ler('pg-sessao', null);
 const meta = ler('pg-sync', { alterado: 0 });   // hora da última alteração feita neste aparelho
-const nuvem = { status: '', ocupado: false, denovo: false, timer: null };
+const nuvem = { status: '', ocupado: false, denovo: false, timer: null, google: null };
+// pergunta ao servidor se o login com Google já foi ativado; o botão só aparece quando sim
+function verProvedores() {
+  if (sessao || nuvem.google !== null) return;
+  api('/auth/v1/settings').then(r => r.json()).then(j => { nuvem.google = !!(j && j.external && j.external.google); if (nuvem.google && state.tela === 'config') render(); }).catch(() => {});
+}
 
 function tocou() {
   meta.alterado = Date.now(); gravar('pg-sync', meta);
@@ -1181,6 +1187,7 @@ async function sincronizar() {
 
 render();
 sincronizar();
+if (state.tela === 'config') verProvedores();
 
 if (window.addEventListener) {
   window.addEventListener('online', sincronizar);
