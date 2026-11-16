@@ -521,7 +521,8 @@ function render() {
     h += `<h2 class="sec">Conta e nuvem</h2>`;
     if (sessao) {
       h += `<p class="eyebrow">Conectado como <b>${esc(sessao.email)}</b>. ${esc(nuvem.status)}</p>`;
-      h += `<div class="rowsel"><button class="btn ghost grow" data-sync="1">Sincronizar agora</button><button class="btn ghost" data-sair="1">Sair</button></div>`;
+      if (nuvem.conflito) h += `<div class="empty"><h2>Quais dados manter?</h2><p>Esta conta já tem dados na nuvem, e este aparelho também tem os seus. Escolha um dos dois; o outro será substituído.</p><div class="rowsel"><button class="btn primary grow" data-resolver="local">Os deste aparelho</button><button class="btn ghost grow" data-resolver="nuvem">Os da nuvem</button></div></div>`;
+      h += `<div class="rowsel">${nuvem.conflito ? '' : '<button class="btn ghost grow" data-sync="1">Sincronizar agora</button>'}<button class="btn ghost" data-sair="1">Sair</button></div>`;
     } else {
       h += `<p class="eyebrow">${esc(nuvem.status) || 'Entre com seu e-mail para guardar os dados na nuvem e usar em outros aparelhos. Não tem senha: você recebe um link.'}</p>`;
       h += `<div class="field"><label for="nuvemEmail">E-mail</label><input id="nuvemEmail" type="email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com"></div><button class="btn primary" data-entrar="1">Enviar link de acesso</button>`;
@@ -999,6 +1000,11 @@ app.addEventListener('click', ev => {
     }
   }
   else if (d.sync) { nuvem.status = 'Sincronizando…'; sincronizar(); }
+  else if (d.resolver) {
+    meta.alterado = d.resolver === 'local' ? Date.now() : 0;
+    meta.vinculado = true; gravar('pg-sync', meta);
+    nuvem.conflito = false; nuvem.status = 'Sincronizando…'; sincronizar();
+  }
   else if (d.sair) {
     const tk = sessao && sessao.at;
     if (tk) api('/auth/v1/logout', { method: 'POST' }, tk).catch(() => {});
@@ -1121,7 +1127,9 @@ function guardarSessao(o) {
   sessao = { at: o.access_token, rt: o.refresh_token, expira: Date.now() + (+o.expires_in || 3600) * 1000, uid: corpo.sub, email: corpo.email || '' };
   gravar('pg-sessao', sessao);
 }
-function encerrarSessao(msg) { sessao = null; gravar('pg-sessao', null); clearTimeout(nuvem.timer); nuvem.status = msg || ''; }
+function encerrarSessao(msg) { sessao = null; gravar('pg-sessao', null); clearTimeout(nuvem.timer); nuvem.status = msg || ''; nuvem.conflito = false; meta.vinculado = false; gravar('pg-sync', meta); }
+// este aparelho já tem cadastros ou histórico próprios?
+const temLocal = () => !!ler('pg-dados-v1', null) || Object.keys(state.feitos).length > 0 || Object.keys(state.log).length > 0;
 async function token() {
   if (sessao.expira - 60000 > Date.now()) return sessao.at;
   const r = await api('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: sessao.rt }) });
@@ -1152,7 +1160,15 @@ async function sincronizar() {
     const r = await api('/rest/v1/user_data?select=dados,feitos,log,alterado', {}, tk);
     if (!r.ok) throw new Error('leitura ' + r.status);
     const remoto = (await r.json())[0];
+    // Primeira vez deste aparelho nesta conta, com dados dos dois lados: quem decide é a pessoa, nunca o relógio.
+    if (remoto && !meta.vinculado && temLocal()) {
+      nuvem.conflito = true; nuvem.ocupado = false;
+      nuvem.status = 'Falta escolher quais dados manter.';
+      if (state.tela === 'config') render();
+      return;
+    }
     if (remoto && +remoto.alterado > meta.alterado) {
+      if (meta.vinculado) guardarDesfazer('Dados da nuvem carregados');
       aplicarRemoto(remoto);
       meta.alterado = +remoto.alterado; gravar('pg-sync', meta);
       puxou = true;
@@ -1163,6 +1179,7 @@ async function sincronizar() {
         body: JSON.stringify({ user_id: sessao.uid, dados: JSON.parse(foto()), feitos: state.feitos, log: state.log, alterado: enviado, updated_at: new Date().toISOString() }) }, tk);
       if (!w.ok) throw new Error('gravação ' + w.status);
     }
+    meta.vinculado = true; gravar('pg-sync', meta); nuvem.conflito = false;
     nuvem.status = 'Sincronizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '.';
   } catch (e) {
     if (sessao) nuvem.status = 'Não consegui sincronizar agora. Seus dados continuam salvos neste aparelho.';
