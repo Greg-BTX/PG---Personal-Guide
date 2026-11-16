@@ -1,6 +1,6 @@
 // Service worker: guarda o app no aparelho para abrir sem internet.
 // Estratégia: tenta a rede primeiro (para pegar atualizações) e, sem conexão, usa a cópia guardada.
-const CACHE = 'pratica-guiada-v5';
+const CACHE = 'pratica-guiada-v6';
 const BASE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

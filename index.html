@@ -248,6 +248,36 @@ button.vid{cursor:pointer}
 .tool.fim svg{color:var(--bg)}
 .nota{margin-top:8px}
 .nota textarea{background:transparent}
+
+.sets{background:var(--surface);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.sets:empty{display:none}
+.sets-h{display:flex;flex-direction:column;gap:2px;margin-bottom:2px}
+.sets-h b{font-family:var(--display);font-size:17px}
+.sets-h span{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.set{display:flex;align-items:center;gap:8px}
+.set .sn{flex:none;width:18px;font-family:var(--display);font-weight:700;color:var(--muted);text-align:center}
+.set input{flex:1;min-width:0;background:var(--bg);text-align:center;padding:10px 6px;font-weight:600;font-variant-numeric:tabular-nums}
+.set .un{flex:none;font-size:13px;color:var(--muted)}
+.setok{flex:none;width:46px;height:46px;border-radius:14px;border:2px solid var(--line);color:var(--muted);font-weight:700;font-size:18px}
+.set.ok .setok{background:var(--good);border-color:var(--good);color:var(--bg)}
+.set.ok input{opacity:.65}
+.addset{align-self:flex-start;padding:6px 0;font-size:14px;font-weight:600;color:var(--accent)}
+.rest{display:flex;align-items:center;gap:10px;background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:8px 8px 8px 14px;font-weight:600}
+.rest b{flex:1;font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums}
+.rest button{padding:8px 12px;border-radius:10px;background:var(--accent-ink);color:var(--accent);font-weight:700;font-size:14px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stats div{background:var(--surface);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column}
+.stats b{font-family:var(--display);font-size:34px;line-height:1.1;color:var(--accent);font-variant-numeric:tabular-nums}
+.stats span{font-size:13px;color:var(--muted)}
+.mes b{font-family:var(--display);font-size:18px;text-transform:capitalize}
+.mes .icon{font-size:22px;font-weight:700}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cw{text-align:center;font-size:12px;font-weight:700;color:var(--muted)}
+.cd{aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums;border:2px solid transparent}
+.cd.part{border-color:var(--good)}
+.cd.full{background:var(--good);color:var(--bg)}
+.cd.hoje:not(.full){color:var(--accent)}
+.cd.sel{outline:2px solid var(--ink);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -355,11 +385,15 @@ const state = { tela:'inicio', cat:'musica', dia:hoje, ex:null, editR:null, edit
 const config = Object.assign({ diaAtual:true, telaLigada:true, textoGrande:false }, ler('pg-config-v1', {}));
 const salvarConfig = () => gravar('pg-config-v1', config);
 const salvar = () => gravar('pg-feitos-v2', state.feitos);
+state.log = ler('pg-log-v1', {});   // log[exercício][data] = [{ c: carga, r: repetições, ok }]
+const salvarLog = () => gravar('pg-log-v1', state.log);
+{ const d = new Date(); state.mes = { y: d.getFullYear(), m: d.getMonth() }; state.histDia = null; }
 
 // data do dia escolhido, dentro da semana atual (segunda a domingo)
 const posSemana = d => (d + 6) % 7;
 function dataDe(dia) { const dt = new Date(); dt.setDate(dt.getDate() + posSemana(dia) - posSemana(hoje)); return dt; }
-function chaveDe(dia) { const d = dataDe(dia); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+const chaveData = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const chaveDe = dia => chaveData(dataDe(dia));
 function feitosDe(rid, criar) {
   const k = chaveDe(state.dia);
   if (!state.feitos[k]) { if (!criar) return []; state.feitos[k] = {}; }
@@ -443,6 +477,8 @@ const ARTE = {
   musica: '<svg viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(35 60 60)"><rect x="53" y="8" width="14" height="14" rx="3" fill="var(--ink)"/><rect x="56" y="20" width="8" height="46" fill="var(--muted)"/><circle cx="60" cy="62" r="17" fill="var(--accent)"/><circle cx="60" cy="86" r="25" fill="var(--accent)"/><circle cx="60" cy="72" r="7" fill="var(--bg)"/><rect x="50" y="93" width="20" height="4" rx="2" fill="var(--accent-ink)"/><path d="M58 12V94M60 12V94M62 12V94" stroke="var(--ink)" stroke-width=".7" opacity=".8"/></g></svg>',
   musculacao: '<svg viewBox="0 0 120 120" aria-hidden="true"><g transform="rotate(-25 60 60)"><rect x="30" y="56" width="60" height="8" rx="4" fill="var(--muted)"/><rect x="28" y="36" width="13" height="48" rx="5" fill="var(--good)"/><rect x="79" y="36" width="13" height="48" rx="5" fill="var(--good)"/><rect x="15" y="44" width="10" height="32" rx="4" fill="var(--ink)"/><rect x="95" y="44" width="10" height="32" rx="4" fill="var(--ink)"/></g></svg>'
 };
+const calIc = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>';
+const MESES_LONGOS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 const lapis = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
 const lixo = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5"/></svg>';
 const apagarItem = (chave, nome) => state.confirma === chave
@@ -471,7 +507,7 @@ function render() {
 
   if (state.tela === 'inicio') {
     if (state.editando) h += `<div class="top"><h1 class="brand">Toque no que quer editar</h1><button class="daybtn" data-modoedit="1">Concluir</button></div><div class="tiles">`;
-    else h += `<div class="top"><h1 class="brand">O que vamos praticar?</h1><span class="acts"><button class="icon" data-modoedit="1" aria-label="Editar">${lapis}</button><button class="icon" data-config="1" aria-label="Configurações">${engrenagem}</button></span></div><div class="tiles">`;
+    else h += `<div class="top"><h1 class="brand">O que vamos praticar?</h1><span class="acts"><button class="icon" data-hist="1" aria-label="Histórico">${calIc}</button><button class="icon" data-modoedit="1" aria-label="Editar">${lapis}</button><button class="icon" data-config="1" aria-label="Configurações">${engrenagem}</button></span></div><div class="tiles">`;
     categorias.forEach(c => h += `<button class="tile ${esc(c.id)}" data-cat="${esc(c.id)}">${state.editando ? `<i class="badge">${lapis}</i>` : ''}${ARTE[c.id] || `<span class="letra">${esc(c.nome.charAt(0).toUpperCase())}</span>`}<span>${esc(c.nome)}</span></button>`);
     if (state.editando || !categorias.length) h += `<button class="tile nova" data-novacat="1" aria-label="Nova categoria"><span class="letra">+</span><span>Nova</span></button>`;
     h += `</div>`;
@@ -485,6 +521,28 @@ function render() {
     h += `<h2 class="sec">Cópia de segurança</h2><p class="eyebrow">Guarda em um arquivo tudo o que você cadastrou. Importar substitui os dados atuais.</p>`;
     h += `<div class="rowsel"><button class="btn ghost grow" data-exportar="1">Exportar</button><label class="btn ghost grow" for="impArq">Importar</label></div><input id="impArq" type="file" accept="application/json,.json" class="oculto">`;
     if (state.aviso) h += `<p class="aviso ok">${esc(state.aviso)}</p>`;
+  }
+
+  else if (state.tela === 'historico') {
+    const { y, m } = state.mes, hojeK = chaveData(new Date());
+    const dias = new Date(y, m + 1, 0).getDate(), desloc = (new Date(y, m, 1).getDay() + 6) % 7;
+    const k = d => y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    let noMes = 0;
+    for (let d = 1; d <= dias; d++) if (diaTreinado(k(d))) noMes++;
+    h += voltar('Início') + `<h1 class="brand">Histórico</h1>`;
+    h += `<div class="stats"><div><b>${sequencia()}</b><span>treinos em sequência</span></div><div><b>${noMes}</b><span>dias em ${MESES_LONGOS[m]}</span></div></div>`;
+    h += `<div class="top mes"><button class="icon" data-mesnav="-1" aria-label="Mês anterior">‹</button><b>${MESES_LONGOS[m]} ${y}</b><button class="icon" data-mesnav="1" aria-label="Próximo mês">›</button></div>`;
+    h += `<div class="cal">${['S','T','Q','Q','S','S','D'].map(x => `<span class="cw">${x}</span>`).join('')}${'<span></span>'.repeat(desloc)}`;
+    for (let d = 1; d <= dias; d++) {
+      const t = diaTreinado(k(d));
+      h += `<button class="cd${t === 2 ? ' full' : t === 1 ? ' part' : ''}${k(d) === hojeK ? ' hoje' : ''}${k(d) === state.histDia ? ' sel' : ''}" data-hd="${k(d)}" aria-label="Dia ${d}${t ? ', treinado' : ''}">${d}</button>`;
+    }
+    h += `</div>`;
+    const f = state.histDia && state.feitos[state.histDia];
+    if (state.histDia) {
+      const linhas = Object.keys(f || {}).filter(r => f[r].length).map(r => `<div class="dayrow"><span class="dn">${esc(rotinas[r] ? rotinas[r].nome : 'Rotina apagada')}</span><span class="rn">${f[r].length}${rotinas[r] ? ' de ' + idsDe(r).length : ''} exerc.</span></div>`);
+      h += `<p class="eyebrow">${+state.histDia.slice(8)} de ${MESES_LONGOS[+state.histDia.slice(5, 7) - 1]}</p>` + (linhas.length ? `<div class="choices">${linhas.join('')}</div>` : `<p class="eyebrow">Sem treino registrado.</p>`);
+    }
   }
 
   else if (state.tela === 'semana') {
@@ -538,7 +596,7 @@ function render() {
     h += `<div class="top">${voltar(rotinas[rid].nome)}<span class="count">${ix + 1} de ${ids.length}</span><button class="daybtn" data-edite="${state.ex}">Editar</button></div>`;
     h += `<div class="segs" aria-hidden="true">${ids.map(id => `<i class="${id === state.ex ? 'cur' : feitos.includes(id) ? 'ok' : ''}"></i>`).join('')}</div>`;
     h += `<section class="routine"><h1 class="brand">${esc(e.nome)}</h1><div class="chips">${[!T.total && e.min ? e.min + ' min' : '', e.bpm, ids.some(x => faseDe(x) !== faseDe(state.ex)) ? faseDe(state.ex) : ''].filter(Boolean).map(t => `<span>${esc(t)}</span>`).join('')}</div>`;
-    h += `<div class="tools" id="tools">${toolsHTML()}</div>`;
+    h += `<div class="tools" id="tools">${toolsHTML()}</div><div class="sets" id="sets">${setsHTML()}</div>`;
     if (state.player && vid) h += `<div class="player"><iframe src="https://www.youtube-nocookie.com/embed/${vid}?autoplay=1" title="Vídeo de referência" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
     if (e.imagem) h += `<div class="foto"><img src="${e.imagem}" alt="Imagem de referência"></div>`;
     else if (ehImagem(e.video)) h += `<div class="foto"><img src="${esc(e.video)}" alt="Imagem de referência"></div>`;
@@ -591,6 +649,8 @@ function render() {
     h += `<div class="field"><label for="exNome">Nome</label><input id="exNome" data-f="exNome" value="${esc(e.nome)}"></div>`;
     h += `<div class="duo"><div class="field"><label for="exMin">Minutos</label><input id="exMin" data-f="exMin" type="number" min="0" inputmode="numeric" value="${esc(e.min)}"></div>`;
     h += `<div class="field"><label for="exDet">Detalhe</label><input id="exDet" data-f="exDet" placeholder="3x12 · 20 kg, 60 bpm" value="${esc(e.bpm)}"></div></div>`;
+    h += `<div class="duo"><div class="field"><label for="exSeries">Séries</label><input id="exSeries" data-f="exSeries" type="number" min="0" max="12" inputmode="numeric" placeholder="${seriesDe(e) || 'sem'}" value="${esc(e.series)}"></div>`;
+    h += `<div class="field"><label for="exDesc">Descanso entre séries (segundos)</label><input id="exDesc" data-f="exDesc" type="number" min="5" inputmode="numeric" placeholder="60" value="${esc(e.descanso)}"></div></div>`;
     h += `<div class="field"><label for="exPassos">Como fazer (um passo por linha)</label><textarea id="exPassos" data-f="exPassos" rows="5">${esc((e.passos || []).join('\n'))}</textarea></div>`;
     h += `<div class="field"><label for="exVideo">Link do vídeo ou GIF</label><input id="exVideo" data-f="exVideo" type="url" inputmode="url" placeholder="Cole o link do YouTube" value="${esc(e.video)}"></div>`;
     h += `<div class="field"><label for="exFoto">Foto de referência</label>`;
@@ -668,7 +728,7 @@ function prepararEx() {
   if (T.ex === state.ex) return;
   const e = exercicios[state.ex], seg = (+e.min || 0) * 60;
   T = { ex: state.ex, total: seg, restante: seg, fim: null };
-  pararMetro();
+  pararMetro(); R.fim = null;
   metro.bpm = e.bpmUlt || bpmDe(e.bpm) || 0;
 }
 function toolsHTML() {
@@ -692,6 +752,80 @@ setInterval(() => {
   if (r <= 0) { T.fim = null; T.restante = 0; alarme(); atualizarTools(); }
 }, 400);
 
+// séries: quantas o exercício pede (campo próprio ou lido de um detalhe como "3x12")
+const seriesDe = e => {
+  if (e.series !== undefined && e.series !== null && e.series !== '') return Math.min(12, Math.max(0, +e.series || 0));
+  const m = /(\d+)\s*[x×]\s*\d+/i.exec(e.bpm || '');
+  return m ? Math.min(12, +m[1]) : 0;
+};
+const repsDe = e => { const m = /\d+\s*[x×]\s*(\d+)/i.exec(e.bpm || ''); return m ? m[1] : ''; };
+function setsDe(exId, criar) {
+  const k = chaveDe(state.dia);
+  if (!state.log[exId]) { if (!criar) return []; state.log[exId] = {}; }
+  if (!state.log[exId][k]) { if (!criar) return []; state.log[exId][k] = []; }
+  return state.log[exId][k];
+}
+function setEm(i) { const a = setsDe(state.ex, true); while (a.length <= i) a.push({ c:'', r:'', ok:false }); return a[i]; }
+function ultimaVez(exId) {
+  const k = chaveDe(state.dia), porEx = state.log[exId] || {};
+  const d = Object.keys(porEx).filter(x => x < k && porEx[x].some(t => t.ok)).sort().pop();
+  return d ? { data: d, sets: porEx[d].filter(t => t.ok) } : null;
+}
+// descanso entre séries
+const R = { fim: null };
+const restAgora = () => R.fim ? Math.max(0, Math.ceil((R.fim - Date.now()) / 1000)) : 0;
+function setsHTML() {
+  const e = exercicios[state.ex];
+  if (!e) return '';
+  const feitas = setsDe(state.ex), n = Math.max(seriesDe(e), feitas.length);
+  if (!n) return '';
+  const ant = ultimaVez(state.ex), reps = repsDe(e);
+  let h = `<div class="sets-h"><b>Séries</b>${ant ? `<span>Última vez, ${+ant.data.slice(8)} ${MESES[+ant.data.slice(5, 7) - 1]}: ${ant.sets.map(t => esc((t.c !== '' ? t.c + ' kg × ' : '') + t.r)).join(' · ')}</span>` : ''}</div>`;
+  for (let i = 0; i < n; i++) {
+    const t = feitas[i] || { c:'', r:'', ok:false };
+    const p = (ant && (ant.sets[i] || ant.sets[ant.sets.length - 1])) || {};
+    h += `<div class="set${t.ok ? ' ok' : ''}"><span class="sn">${i + 1}</span>`;
+    h += `<input type="number" inputmode="decimal" step="any" aria-label="Carga da série ${i + 1}, em kg" data-set="${i}" data-k="c" placeholder="${esc(p.c ?? '')}" value="${esc(t.c)}"><span class="un">kg ×</span>`;
+    h += `<input type="number" inputmode="numeric" aria-label="Repetições da série ${i + 1}" data-set="${i}" data-k="r" placeholder="${esc(p.r || reps)}" value="${esc(t.r)}">`;
+    h += `<button class="setok" data-setok="${i}" aria-pressed="${!!t.ok}" aria-label="Série ${i + 1} feita">✓</button></div>`;
+  }
+  h += `<button class="addset" data-addset="1">+ série</button>`;
+  if (R.fim) h += `<div class="rest"><span>Descanso</span><b id="restv">${fmt(restAgora())}</b><button data-restskip="1">Pular</button></div>`;
+  return h;
+}
+function atualizarSets() { const el = document.getElementById('sets'); if (el) el.innerHTML = setsHTML(); }
+setInterval(() => {
+  if (!R.fim) return;
+  const r = restAgora(), el = document.getElementById('restv');
+  if (el) el.textContent = fmt(r);
+  if (r <= 0) { R.fim = null; alarme(); atualizarSets(); }
+}, 400);
+
+// histórico: 0 = sem treino, 1 = treino parcial, 2 = treino completo
+function diaTreinado(k) {
+  const d = state.feitos[k];
+  if (!d) return 0;
+  let algum = false, completo = true;
+  for (const r in d) {
+    if (!d[r].length) continue;
+    algum = true;
+    if (rotinas[r] && d[r].filter(x => exercicios[x]).length < idsDe(r).length) completo = false;
+  }
+  return algum ? (completo ? 2 : 1) : 0;
+}
+// sequência: treinos seguidos sem faltar em dia que tinha rotina marcada (dias livres não quebram)
+function sequencia() {
+  let n = 0;
+  const dt = new Date();
+  for (let i = 0; i < 400; i++) {
+    const agendado = Object.values(agenda).some(a => a && rotinas[a[dt.getDay()]]);
+    if (diaTreinado(chaveData(dt))) n++;
+    else if (agendado && i > 0) break;
+    dt.setDate(dt.getDate() - 1);
+  }
+  return n;
+}
+
 // tela ligada durante o treino
 let trava = null;
 async function telaLigada(on) {
@@ -704,11 +838,11 @@ const emTreino = () => config.telaLigada && (state.tela === 'rotina' || state.te
 
 // botão voltar do Android: mantém uma entrada extra no histórico enquanto não se está no Início
 let armadilha = false, ignorarPop = false;
-const alvoVoltar = () => ({ config:'inicio', semana:'inicio', rotina: config.diaAtual ? 'inicio' : 'semana', exercicio:'rotina', gerir: state.voltaGerir, editRotina: state.voltaRot, editEx: state.voltaEx }[state.tela] || 'inicio');
+const alvoVoltar = () => ({ config:'inicio', semana:'inicio', rotina: config.diaAtual ? 'inicio' : 'semana', exercicio:'rotina', gerir: state.voltaGerir, editRotina: state.voltaRot, editEx: state.voltaEx, historico:'inicio' }[state.tela] || 'inicio');
 
 function ir(tela) {
   state.tela = tela; state.confirma = null; state.player = false; state.aviso = ''; state.colando = false;
-  if (tela !== 'exercicio') { T.ex = null; T.fim = null; pararMetro(); }
+  if (tela !== 'exercicio') { T.ex = null; T.fim = null; R.fim = null; pararMetro(); }
   try {
     if (tela !== 'inicio' && !armadilha) { history.pushState({ pg: 1 }, ''); armadilha = true; }
     else if (tela === 'inicio' && armadilha) { armadilha = false; ignorarPop = true; history.back(); }
@@ -742,10 +876,32 @@ app.addEventListener('click', ev => {
     atualizarTools();
     return;
   }
+  if (d.setok !== undefined || d.addset || d.restskip) {
+    const e = exercicios[state.ex];
+    if (d.setok !== undefined) {
+      const i = +d.setok, t = setEm(i);
+      if (t.ok) t.ok = false;
+      else {
+        const ant = ultimaVez(state.ex), p = (ant && (ant.sets[i] || ant.sets[ant.sets.length - 1])) || {};
+        if (t.c === '') t.c = p.c ?? '';
+        if (t.r === '') t.r = p.r || repsDe(e) || '';
+        t.ok = true;
+        const a = setsDe(state.ex), n = Math.max(seriesDe(e), a.length);
+        if (a.filter(x => x.ok).length < n) { R.fim = Date.now() + (+e.descanso || 60) * 1000; audio(); } else R.fim = null;
+      }
+    }
+    else if (d.addset) setEm(Math.max(seriesDe(e), setsDe(state.ex).length));
+    else R.fim = null;
+    salvarLog(); atualizarSets();
+    return;
+  }
   if (!d.del && !d.delitem) state.confirma = null;
 
   if (d.back) ir(alvoVoltar());
   else if (d.config) ir('config');
+  else if (d.hist) { const n = new Date(); state.mes = { y: n.getFullYear(), m: n.getMonth() }; state.histDia = chaveData(n); ir('historico'); }
+  else if (d.mesnav) { const n = new Date(state.mes.y, state.mes.m + (+d.mesnav), 1); state.mes = { y: n.getFullYear(), m: n.getMonth() }; state.histDia = null; }
+  else if (d.hd) state.histDia = d.hd;
   else if (d.toggle) { config[d.toggle] = !config[d.toggle]; salvarConfig(); }
   else if (d.modoedit) state.editando = !state.editando;
   else if (d.cat) {
@@ -824,7 +980,7 @@ app.addEventListener('click', ev => {
   }
   else if (d.exportar) {
     try {
-      const blob = new Blob([JSON.stringify({ app:'pratica-guiada', versao:1, dados: JSON.parse(foto()), feitos: state.feitos, config }, null, 1)], { type:'application/json' });
+      const blob = new Blob([JSON.stringify({ app:'pratica-guiada', versao:1, dados: JSON.parse(foto()), feitos: state.feitos, log: state.log, config }, null, 1)], { type:'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = 'pratica-guiada-' + chaveDe(hoje) + '.json';
       document.body.appendChild(a); a.click(); a.remove();
@@ -877,6 +1033,7 @@ app.addEventListener('change', ev => {
         guardarDesfazer('Dados importados');
         aplicarDados(d);
         if (o.feitos && typeof o.feitos === 'object') { Object.assign(state.feitos, o.feitos); salvar(); }
+        if (o.log && typeof o.log === 'object') { Object.assign(state.log, o.log); salvarLog(); }
         state.aviso = salvarDados() ? '' : 'Importado, mas sem espaço para guardar no aparelho.';
       } catch (e) { state.aviso = 'Este arquivo não é uma cópia do Prática Guiada.'; }
       render();
@@ -897,6 +1054,7 @@ app.addEventListener('change', ev => {
     });
     return;
   }
+  if (d.set !== undefined) { setEm(+d.set)[d.k] = v; salvarLog(); return; }
   if (d.f === 'exNota') { if (exercicios[state.ex]) { exercicios[state.ex].nota = v; salvarDados(); } return; }
   if (d.agenda !== undefined) { (agenda[state.cat] || (agenda[state.cat] = {}))[d.agenda] = v || null; }
   else if (d.f === 'catNome') { if (v) categorias.find(c => c.id === state.cat).nome = v; }
@@ -904,6 +1062,8 @@ app.addEventListener('change', ev => {
   else if (d.f === 'exNome') { if (v) e.nome = v; }
   else if (d.f === 'exMin') e.min = Math.max(0, Math.round(+v || 0));
   else if (d.f === 'exDet') e.bpm = v;
+  else if (d.f === 'exSeries') { if (v === '') delete e.series; else e.series = Math.min(12, Math.max(0, Math.round(+v || 0))); }
+  else if (d.f === 'exDesc') e.descanso = Math.max(5, Math.round(+v || 60));
   else if (d.f === 'exPassos') e.passos = v.split('\n').map(x => x.trim()).filter(Boolean);
   else if (d.f === 'exVideo') e.video = v;
   else return;
