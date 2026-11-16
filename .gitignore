@@ -1,0 +1,6 @@
+node_modules/
+# credenciais nunca entram no repositório (ele é público)
+client_secret*.json
+google-oauth-client.json
+*.secret
+.env

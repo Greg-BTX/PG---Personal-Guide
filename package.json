@@ -1,0 +1,8 @@
+{
+  "name": "pratica-guiada",
+  "private": true,
+  "description": "Web app instalável com rotinas guiadas de música e musculação.",
+  "scripts": {
+    "test": "node tests/rodar.js"
+  }
+}
